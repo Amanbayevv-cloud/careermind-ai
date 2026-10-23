@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import AccountPanel from './components/AccountPanel';
 import ObjectiveAssessment from './components/ObjectiveAssessment';
-import { askCareerAI, type AuthTokens } from './services/careerBackend';
+import { askCareerAI } from './services/careerBackend';
+import { requireSupabase, supabase } from './services/supabaseClient';
+import type { Session } from '@supabase/supabase-js';
 import {
   Compass,
   Briefcase,
@@ -1335,7 +1337,38 @@ export default function App() {
 
   const [chatInput, setChatInput] = useState('');
   const [isAiTyping, setIsAiTyping] = useState(false);
-  const [session, setSession] = useState<AuthTokens | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  useEffect(() => {
+    if (!supabase) return;
+    let mounted = true;
+    void supabase.auth.getSession().then(({ data }) => { if (mounted) setSession(data.session); });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, next) => {
+      if (mounted) setSession(next);
+    });
+    return () => { mounted = false; subscription.unsubscribe(); };
+  }, []);
+
+  const saveProfileToCloud = async () => {
+    if (!session) throw new Error('Avval tizimga kiring');
+    const { error } = await requireSupabase().from('profiles').upsert({
+      user_id: session.user.id, display_name: profile.name, profile_data: profile,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'user_id' });
+    if (error) throw error;
+  };
+  const loadProfileFromCloud = async () => {
+    if (!session) throw new Error('Avval tizimga kiring');
+    const { data, error } = await requireSupabase().from('profiles')
+      .select('profile_data').eq('user_id', session.user.id).maybeSingle();
+    if (error) throw error;
+    if (!data) throw new Error('Bulutda profil hali yo‘q');
+    // Keep the local profile intact if the stored record is malformed.
+    const incoming = data.profile_data;
+    if (!incoming || typeof incoming !== 'object' || Array.isArray(incoming)
+      || typeof incoming.name !== 'string' || !incoming.skills
+      || !incoming.personality || !incoming.preferences) throw new Error('Bulutdagi profil noto‘g‘ri');
+    setProfile(incoming as unknown as UserProfile);
+  };
 
   // Save updates to LocalStorage safely
   useEffect(() => {
@@ -3251,7 +3284,7 @@ export default function App() {
           <p className="text-xs text-slate-400 mt-1">Shaxsiy diagnostika ma'lumotlaringizni tahrirlash.</p>
         </div>
 
-        <AccountPanel session={session} onSession={setSession} />
+        <AccountPanel session={session} onSession={setSession} onSaveProfile={saveProfileToCloud} onLoadProfile={loadProfileFromCloud} />
         <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 sm:p-8 backdrop-blur-md space-y-6">
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
