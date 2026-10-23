@@ -31,3 +31,12 @@
 
 ## Known limitations
 No live Supabase project, OpenAI API key, or deployment credentials were provided. This branch supplies functional backend/source components but does not yet activate login or replace the current on-screen chatbot. Assessment question bank is intentionally small and not psychometrically validated; no diagnostic or guarantee claims.
+
+## Stage 2 progress (23 October 2026)
+- Added Supabase JS client with auto refresh and persistent auth session.
+- Added UI controls for sign-up, sign-in, sign-out, opt-in profile upload and explicit cloud download confirmation.
+- Existing local profile continues to work without cloud access.
+- No OpenAI API key is required for guest mode; authenticated AI endpoint will report a service configuration error without the provider key.
+- IMPORTANT: package.json now declares @supabase/supabase-js, but package-lock.json has NOT been regenerated in GitHub. Run npm install locally and commit package-lock.json before CI / npm ci.
+- Manual tests to perform: account signup with email verification, refresh session restore, logout, profile save/load, guest mode, and assessment save.
+- Avoid storing secrets in .env committed to Git. Keep the PR in draft until build checks and verification are complete.
