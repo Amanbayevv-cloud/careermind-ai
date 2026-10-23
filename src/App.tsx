@@ -1,4 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
+import AccountPanel from './components/AccountPanel';
+import ObjectiveAssessment from './components/ObjectiveAssessment';
+import { askCareerAI, type AuthTokens } from './services/careerBackend';
 import {
   Compass,
   Briefcase,
@@ -1332,6 +1335,7 @@ export default function App() {
 
   const [chatInput, setChatInput] = useState('');
   const [isAiTyping, setIsAiTyping] = useState(false);
+  const [session, setSession] = useState<AuthTokens | null>(null);
 
   // Save updates to LocalStorage safely
   useEffect(() => {
@@ -1404,7 +1408,8 @@ export default function App() {
     return Math.floor(xp / 200) + 1;
   };
 
-  const handleSendMessage = (textToSend?: string) => {
+  const handleSendMessage = async (textToSend?: string) => {
+    if (isAiTyping) return;
     const query = textToSend || chatInput;
     if (!query.trim()) return;
 
@@ -1419,6 +1424,26 @@ export default function App() {
     if (!textToSend) setChatInput('');
     setIsAiTyping(true);
 
+    if (session) {
+      try {
+        const context = JSON.stringify({ language: lang, career: selectedCareer.titleKey, skillsToImprove: bestMatch.missingSkills });
+        const result = await askCareerAI(query, session.access_token, context);
+        setChatMessages(prev => [...prev, {
+          id: `ai-${Date.now()}`, sender: 'ai', text: result.reply,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }]);
+      } catch {
+        setChatMessages(prev => [...prev, {
+          id: `error-${Date.now()}`, sender: 'ai',
+          text: "AI xizmatiga ulanib bo‘lmadi. Hisobingiz yoki server sozlamalarini tekshiring. Savolni qayta yuborishingiz mumkin.",
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }]);
+      } finally {
+        setIsAiTyping(false);
+      }
+      return;
+    }
+    // Guest mode: local keyword-based suggestions, not an AI model.
     // Realistic smart response generator based on user's exact profile and query
     setTimeout(() => {
       let replyText = "";
@@ -2281,6 +2306,8 @@ export default function App() {
               </div>
             </div>
           )}
+
+          {assessmentStep === 6 && <ObjectiveAssessment session={session} />}
 
           {/* Navigation Buttons */}
           <div className="mt-8 pt-6 border-t border-slate-800/80 flex items-center justify-between">
@@ -3224,6 +3251,7 @@ export default function App() {
           <p className="text-xs text-slate-400 mt-1">Shaxsiy diagnostika ma'lumotlaringizni tahrirlash.</p>
         </div>
 
+        <AccountPanel session={session} onSession={setSession} />
         <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 sm:p-8 backdrop-blur-md space-y-6">
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
