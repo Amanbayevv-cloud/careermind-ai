@@ -1,24 +1,50 @@
 import { useState } from 'react';
-import { signIn, signUp, type AuthTokens } from '../services/careerBackend';
-interface Props { session: AuthTokens | null; onSession: (value: AuthTokens | null) => void }
-export default function AccountPanel({ session, onSession }: Props) {
+import type { Session } from '@supabase/supabase-js';
+import { requireSupabase } from '../services/supabaseClient';
+interface Props { session: Session | null; onSession: (value: Session | null) => void; onSaveProfile: () => Promise<void>; onLoadProfile: () => Promise<void> }
+export default function AccountPanel({ session, onSession, onSaveProfile, onLoadProfile }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
+  const [syncBusy, setSyncBusy] = useState(false);
+  const sync = async (fn: () => Promise<void>, success: string) => {
+    setSyncBusy(true); setNotice('');
+    try { await fn(); setNotice(success); }
+    catch (e) { setNotice(e instanceof Error ? e.message : 'Amal bajarilmadi'); }
+    finally { setSyncBusy(false); }
+  };
   if (session) return <section className="bg-slate-900 border border-slate-700 rounded-2xl p-5 space-y-3">
-    <h3 className="text-white font-bold">Bulutli hisob faol</h3>
-    <p className="text-slate-400 text-sm">Ushbu sessiya sahifa yangilanganda tugaydi. Lokal profilingiz avtomatik yuborilmaydi.</p>
-    <button className="bg-slate-700 rounded-lg px-4 py-2" onClick={() => onSession(null)}>Chiqish</button>
+    <h3 className="text-white font-bold">Bulutli hisob: {session.user.email}</h3>
+    <p className="text-slate-400 text-xs">Profil bulutga faqat siz tugmani bosganingizda yuboriladi.</p>
+    <div className="flex flex-wrap gap-2">
+      <button disabled={syncBusy} className="bg-indigo-600 rounded-lg px-4 py-2 disabled:opacity-50" onClick={() => void sync(onSaveProfile, 'Profil bulutga saqlandi')}>Profilni saqlash</button>
+      <button disabled={syncBusy} className="bg-slate-700 rounded-lg px-4 py-2 disabled:opacity-50" onClick={() => {
+        if (window.confirm('Lokal profil o‘rniga bulutdagi profilni yuklaysizmi?')) void sync(onLoadProfile, 'Profil yuklandi');
+      }}>Bulutdan yuklash</button>
+      <button disabled={syncBusy} className="bg-slate-800 rounded-lg px-4 py-2 disabled:opacity-50" onClick={() => void sync(async () => {
+        const { error } = await requireSupabase().auth.signOut();
+        if (error) throw error;
+        onSession(null);
+      }, 'Hisobdan chiqildi')}>Chiqish</button>
+    </div>
+    {notice && <p role="status" className="text-amber-300 text-sm">{notice}</p>}
   </section>;
   return <form className="bg-slate-900 border border-slate-700 rounded-2xl p-5 space-y-3"
     onSubmit={async e => { e.preventDefault(); setNotice(''); setBusy(true); try {
+      const client = requireSupabase();
       if (mode === 'signup') {
-        const result = await signUp(email, password);
-        if (result.session) onSession(result.session);
+        const { data, error } = await client.auth.signUp({ email, password });
+        if (error) throw error;
+        if (data.session) onSession(data.session);
         else setNotice('Email tasdiqlash xatini tekshiring. Keyin tizimga kiring.');
-      } else { onSession(await signIn(email, password)); }
+      } else {
+        const { data, error } = await client.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        onSession(data.session);
+      }
+      setPassword('');
     } catch (error) { setNotice(error instanceof Error ? error.message : 'Kirish amalga oshmadi'); }
     finally { setBusy(false); } }}>
     <h3 className="font-bold text-white">CareerMind hisobingiz</h3>
