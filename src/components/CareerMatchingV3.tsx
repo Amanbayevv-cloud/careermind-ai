@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { requireSupabase } from '../services/supabaseClient';
 import type { Domain3 } from '../assessment/assessmentV3';
-import { DOMAIN_LABELS } from '../assessment/assessmentV3';
 
 export interface MatchCareer {id:string;title:string;category:string;requiredSkills:Record<string,number>;associatedInterests:string[];description:string}
 export interface MatchProfile {interests:string[];skills:Record<string,number>}
