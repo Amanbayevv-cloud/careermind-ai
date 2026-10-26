@@ -3,6 +3,7 @@ import AccountPanel from './components/AccountPanel';
 import SupportPage from './components/SupportPage';
 import ObjectiveAssessment from './components/ObjectiveAssessment';
 import AssessmentV3 from './components/AssessmentV3';
+import AdaptiveAssessment from './components/AdaptiveAssessment';
 import { askCareerAI } from './services/careerBackend';
 import { requireSupabase, supabase } from './services/supabaseClient';
 import type { Session } from '@supabase/supabase-js';
@@ -3418,7 +3419,8 @@ export default function App() {
         <main className="transition-all duration-300">
           {activeTab === 'home' && renderLandingPage()}
           {activeTab === 'assessment' && <><div className="max-w-4xl mx-auto px-4 pt-6"><button onClick={() => setActiveTab('assessmentV3')} className="bg-cyan-700 hover:bg-cyan-600 text-white rounded-xl px-5 py-3 font-bold">Yangi: Assessment 3.0 — 30 savolni boshlash</button></div>{renderAssessment()}</>}
-          {activeTab === 'assessmentV3' && <AssessmentV3 session={session} />}
+          {activeTab === 'assessmentV3' && <><div className="max-w-4xl mx-auto px-4 pt-6"><button onClick={() => setActiveTab('adaptiveAssessment')} className="bg-purple-700 hover:bg-purple-600 text-white rounded-xl px-5 py-3 font-bold">Adaptive Assessment 3.1 ni boshlash</button></div><AssessmentV3 session={session} /></>}
+          {activeTab === 'adaptiveAssessment' && <AdaptiveAssessment session={session} />}
           {activeTab === 'dashboard' && renderDashboard()}
           {activeTab === 'careers' && renderCareerDirectory()}
           {activeTab === 'myCareer' && renderCareerDetails()}
