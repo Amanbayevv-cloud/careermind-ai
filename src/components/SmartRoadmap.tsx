@@ -4,6 +4,13 @@ import { requireSupabase } from '../services/supabaseClient';
 import { DOMAIN_LABELS, DOMAIN_PRACTICE, DOMAINS_V3, type Domain3 } from '../assessment/assessmentV3';
 
 type Task = {id:string; week:number; title:string; domain:Domain3};
+function errorMessage(e: unknown): string {
+ if (e && typeof e === 'object' && 'message' in e && typeof e.message === 'string') {
+  const code = 'code' in e && typeof e.code === 'string' ? ` (${e.code})` : '';
+  return e.message + code;
+ }
+ return 'Noma’lum xatolik. Supabase SQL jadvali va RLS qoidalarini tekshiring.';
+}
 type AssessmentRow = {id:string;version:string;results:{scores?:Partial<Record<Domain3,{percent:number}>>}};
 const subjects:Record<Domain3,string[]> = {
  logic:['Mantiqiy ketma-ketliklarni tahlil qilish','Mantiqiy masalalardan 5 tasini yechish'],
@@ -37,7 +44,7 @@ export default function SmartRoadmap({session,career}:{session:Session|null;care
    const {data:tests,error:te}=await client.from('assessment_attempts').select('id,version,results').eq('user_id',session.user.id).in('version',['3.0','3.1-adaptive']).order('created_at',{ascending:false}).limit(1);
    if(te)throw te;
    setAssessment((tests?.[0] as AssessmentRow)||null);
-  }catch(e){setNotice(e instanceof Error?e.message:'Test natijasi yuklanmadi');}
+  }catch(e){setNotice(errorMessage(e));}
   finally{setLoading(false);}
  };
  useEffect(()=>{void load();},[session?.user.id]);
@@ -55,7 +62,7 @@ export default function SmartRoadmap({session,career}:{session:Session|null;care
     plan_data:tasks,completed_tasks:completed,updated_at:new Date().toISOString()
    },{onConflict:'user_id,career_id,duration_months'});
    if(error)throw error;setSaved(true);setNotice('Reja va progress Supabase ga saqlandi');
-  }catch(e){setNotice(e instanceof Error?e.message:'Saqlashda muammo');}finally{setBusy(false);}
+  }catch(e){setNotice('Saqlashda muammo: '+errorMessage(e));}finally{setBusy(false);}
  };
  const retrieve=async()=>{
   if(!session)return;setBusy(true);setNotice('');
@@ -64,7 +71,7 @@ export default function SmartRoadmap({session,career}:{session:Session|null;care
    if(error)throw error;if(!data)throw new Error('Bu kasb va muddat bo‘yicha bulutda reja yo‘q');
    if(!Array.isArray(data.plan_data)||!data.completed_tasks||typeof data.completed_tasks!=='object')throw new Error('Saqlangan reja formati noto‘g‘ri');
    setTasks(data.plan_data as Task[]);setCompleted(data.completed_tasks as Record<string,boolean>);setLoadedKey(key);setSaved(true);setNotice('Reja va progress bulutdan yuklandi');
-  }catch(e){setNotice(e instanceof Error?e.message:'Yuklashda xato');}finally{setBusy(false);}
+  }catch(e){setNotice('Yuklashda xato: '+errorMessage(e));}finally{setBusy(false);}
  };
  const count=tasks.filter(t=>completed[t.id]).length;
  return <section className="max-w-5xl mx-auto px-4 py-8 space-y-6">
