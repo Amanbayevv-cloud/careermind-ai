@@ -1149,52 +1149,33 @@ const CAREER_DATABASE: CareerRequirement[] = [
 ];
 
 const INITIAL_PROFILE: UserProfile = {
-  name: 'Azizbek',
-  age: 23,
-  educationLevel: 'bachelor',
-  university: 'Tashkent University of Information Technologies',
-  fieldOfStudy: 'Computer Science',
-  yearsOfExperience: 1,
+  name: '',
+  age: 0,
+  educationLevel: '' as EducationLevel,
+  university: '',
+  fieldOfStudy: '',
+  yearsOfExperience: 0,
   skills: {
-    programming: 7,
-    mathematics: 6,
-    problemSolving: 8,
-    dataAnalysis: 6,
-    communication: 6,
-    creativity: 5,
-    leadership: 5,
-    research: 6,
-    design: 4,
-    management: 4
+    programming: 0, mathematics: 0, problemSolving: 0, dataAnalysis: 0,
+    communication: 0, creativity: 0, leadership: 0, research: 0,
+    design: 0, management: 0
   },
-  interests: ['Artificial Intelligence', 'Software Development', 'Data Science'],
+  interests: [],
   personality: {
-    analyticalThinking: 8,
-    creativity: 6,
-    leadership: 6,
-    socialInteraction: 5,
-    independence: 8,
-    riskTolerance: 6,
-    attentionToDetail: 7,
-    adaptability: 8
+    analyticalThinking: 0, creativity: 0, leadership: 0, socialInteraction: 0,
+    independence: 0, riskTolerance: 0, attentionToDetail: 0, adaptability: 0
   },
   preferences: {
-    workType: 'remote',
-    salaryImportance: 9,
-    workLifeBalance: 7,
-    careerGrowth: 9,
-    jobStability: 6,
-    internationalOpportunities: 9
+    workType: '' as WorkType, salaryImportance: 0, workLifeBalance: 0,
+    careerGrowth: 0, jobStability: 0, internationalOpportunities: 0
   },
-  careerGoal: 'international_remote',
-  assessmentCompleted: true,
-  selectedCareerId: 'ai-engineer',
-  xp: 320,
-  streakDays: 4,
-  completedTasks: {
-    'ai-m1-1': true
-  },
-  unlockedBadges: ['first_assessment', 'streak_starter']
+  careerGoal: '' as CareerGoal,
+  assessmentCompleted: false,
+  selectedCareerId: null,
+  xp: 0,
+  streakDays: 0,
+  completedTasks: {},
+  unlockedBadges: []
 };
 
 function calculateCareerScores(profile: UserProfile): { career: CareerRequirement; matchScore: number; strengths: string[]; missingSkills: string[] }[] {
@@ -1297,17 +1278,7 @@ export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Persistence of Profile
-  const [profile, setProfile] = useState<UserProfile>(() => {
-    try {
-      const saved = localStorage.getItem('careermind_profile');
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-    return INITIAL_PROFILE;
-  });
+  const [profile, setProfile] = useState<UserProfile>(INITIAL_PROFILE);
 
   // Selected Career ID for details view
   const [inspectedCareerId, setInspectedCareerId] = useState<string>('ai-engineer');
@@ -1316,32 +1287,9 @@ export default function App() {
   const [compareCareerIds, setCompareCareerIds] = useState<string[]>(['ai-engineer', 'data-scientist']);
 
   // Chat message state
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => {
-    try {
-      const saved = localStorage.getItem('careermind_chat');
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-    return [
-      {
-        id: 'msg-1',
-        sender: 'ai',
-        text: "Assalomu alaykum! Men CareerMind AI karyera maslahatchisiman. Sizga qaysi sohani o'rganish, qanday ko'nikmalarni kuchaytirish yoki qanday qilib yuqori daromadli masofaviy ish topish bo'yicha yordam bera olaman?",
-        timestamp: '10:30',
-        quickReplies: [
-          "Qaysi kasb menga eng mos keladi?",
-          "Ushbu oyda nimani o'rganishim kerak?",
-          "AI Engineer bo'lish uchun qaysi bilimlarim yetishmayapti?",
-          "Qanday qilib xalqaro masofaviy ish topish mumkin?"
-        ]
-      }
-    ];
-  });
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
 
-  // Keep cached profile/chat separate for each auth identity; never share guest data with accounts.
+  // Keep cached profile//chat separate for each auth identity; never share guest data with accounts.
   const [localDataOwner, setLocalDataOwner] = useState('guest');
   const [authReady, setAuthReady] = useState(false);
   const defaultChat: ChatMessage[] = [{
@@ -1354,11 +1302,11 @@ export default function App() {
       const rawProfile = localStorage.getItem('careermind_profile_' + owner);
       const rawChat = localStorage.getItem('careermind_chat_' + owner);
       return {
-        profile: rawProfile ? JSON.parse(rawProfile) as UserProfile : { ...INITIAL_PROFILE, name: '', assessmentCompleted: false, selectedCareerId: null, xp: 0, completedTasks: {} } as UserProfile,
+        profile: rawProfile ? JSON.parse(rawProfile) as UserProfile : { ...INITIAL_PROFILE },
         chat: rawChat ? JSON.parse(rawChat) as ChatMessage[] : defaultChat
       };
     } catch {
-      return { profile: { ...INITIAL_PROFILE, name: '', assessmentCompleted: false, selectedCareerId: null, xp: 0, completedTasks: {} } as UserProfile, chat: defaultChat };
+      return { profile: { ...INITIAL_PROFILE }, chat: defaultChat };
     }
   };
 
@@ -2038,7 +1986,7 @@ export default function App() {
                   <label className="block text-xs font-semibold text-slate-300 mb-1">Yosh</label>
                   <input
                     type="number"
-                    value={profile.age}
+                    value={profile.age || ''}
                     onChange={(e) => setProfile({ ...profile, age: Number(e.target.value) })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
                   />
@@ -2053,6 +2001,7 @@ export default function App() {
                     onChange={(e) => setProfile({ ...profile, educationLevel: e.target.value as EducationLevel })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
                   >
+                    <option value="" disabled>Ta’lim darajasini tanlang</option>
                     <option value="high_school">Maktab / Kollej / Litsey</option>
                     <option value="bachelor">Bakalavr talabasi / Bitiruvchi</option>
                     <option value="master">Magistratura</option>
@@ -2089,7 +2038,7 @@ export default function App() {
                     type="number"
                     min="0"
                     max="30"
-                    value={profile.yearsOfExperience}
+                    value={profile.yearsOfExperience || ''}
                     onChange={(e) => setProfile({ ...profile, yearsOfExperience: Number(e.target.value) })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
                   />
