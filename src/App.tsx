@@ -3451,7 +3451,11 @@ export default function App() {
       <div>
         {renderNavbar()}
 
-        <main className="transition-all duration-300">
+        {!authReady || localDataOwner !== (session?.user.id ?? 'guest') ? (
+          <main className="max-w-4xl mx-auto p-10 text-slate-300" role="status">
+            Hisob ma’lumotlari ajratilmoqda…
+          </main>
+        ) : <main className="transition-all duration-300">
           {activeTab === 'home' && renderLandingPage()}
           {activeTab === 'assessment' && <><div className="max-w-4xl mx-auto px-4 pt-6"><button onClick={() => setActiveTab('assessmentV3')} className="bg-cyan-700 hover:bg-cyan-600 text-white rounded-xl px-5 py-3 font-bold">Yangi: Assessment 3.0 — 30 savolni boshlash</button></div>{renderAssessment()}</>}
           {activeTab === 'assessmentV3' && <><div className="max-w-4xl mx-auto px-4 pt-6"><button onClick={() => setActiveTab('adaptiveAssessment')} className="bg-purple-700 hover:bg-purple-600 text-white rounded-xl px-5 py-3 font-bold">Adaptive Assessment 3.1 ni boshlash</button></div><AssessmentV3 session={session} /></>}
@@ -3469,7 +3473,7 @@ export default function App() {
           {activeTab === 'profile' && renderProfile()}
           {activeTab === 'settings' && renderSettings()}
           {activeTab === 'support' && <SupportPage session={session} onGoProfile={() => setActiveTab('profile')} />}
-        </main>
+        </main>}
       </div>
     </div>
   );
