@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import AccountPanel from './components/AccountPanel';
+import SupportPage from './components/SupportPage';
 import ObjectiveAssessment from './components/ObjectiveAssessment';
 import { askCareerAI } from './services/careerBackend';
 import { requireSupabase, supabase } from './services/supabaseClient';
@@ -1619,6 +1620,9 @@ export default function App() {
             ))}
           </div>
 
+          <button onClick={() => setActiveTab('support')}
+            className={`px-3 py-2 rounded-lg text-xs border ${activeTab === 'support' ? 'bg-indigo-600/30 border-indigo-500 text-cyan-300' : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white'}`}
+            title="Qo‘llab-quvvatlash">Yordam</button>
           {/* User Profile / Settings */}
           <button
             onClick={() => setActiveTab('profile')}
@@ -1667,6 +1671,7 @@ export default function App() {
             { id: 'compare', label: t.compare, icon: Scale },
             { id: 'assistant', label: t.aiAssistant, icon: Bot },
             { id: 'profile', label: t.profile, icon: User },
+            { id: 'support', label: 'Qo‘llab-quvvatlash', icon: BookOpen },
             { id: 'settings', label: t.settings, icon: SettingsIcon }
           ].map((item) => {
             const Icon = item.icon;
@@ -3421,6 +3426,7 @@ export default function App() {
           {activeTab === 'assistant' && renderAiAssistant()}
           {activeTab === 'profile' && renderProfile()}
           {activeTab === 'settings' && renderSettings()}
+          {activeTab === 'support' && <SupportPage session={session} onGoProfile={() => setActiveTab('profile')} />}
         </main>
       </div>
     </div>
