@@ -1334,6 +1334,7 @@ export default function App() {
   }, [authReady, session?.user.id, localDataOwner]);
 
   const [autoSaveConsent, setAutoSaveConsent] = useState(false);
+  const [assessmentValidationNotice, setAssessmentValidationNotice] = useState('');
   const [profileSyncStatus, setProfileSyncStatus] = useState('');
   const profileFields = [
     Boolean(profile.name.trim()), profile.age > 0, Boolean(profile.educationLevel),
@@ -1956,6 +1957,11 @@ export default function App() {
 
   const renderAssessment = () => {
     const handleNext = () => {
+      if (assessmentStep === 1 && !profileIsValid) {
+        setAssessmentValidationNotice('Davom etish uchun ism-familiya, yosh, ta’lim darajasi, ta’lim muassasasi va yo‘nalishni to‘ldiring.');
+        return;
+      }
+      setAssessmentValidationNotice('');
       if (assessmentStep < 6) {
         setAssessmentStep(assessmentStep + 1);
       } else {
@@ -1980,6 +1986,7 @@ export default function App() {
 
     return (
       <div className="max-w-4xl mx-auto px-4 py-8">
+        {assessmentValidationNotice && <p role="alert" className="mb-4 text-sm text-amber-300">{assessmentValidationNotice}</p>}
         {/* Progress Bar & Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
