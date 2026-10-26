@@ -1341,18 +1341,49 @@ export default function App() {
     ];
   });
 
+  // Keep cached profile/chat separate for each auth identity; never share guest data with accounts.
+  const [localDataOwner, setLocalDataOwner] = useState('guest');
+  const [authReady, setAuthReady] = useState(false);
+  const defaultChat: ChatMessage[] = [{
+    id: 'msg-1', sender: 'ai',
+    text: "Assalomu alaykum! Men CareerMind AI karyera maslahatchisiman.",
+    timestamp: '10:30'
+  }];
+  const readScopedData = (owner: string) => {
+    try {
+      const rawProfile = localStorage.getItem('careermind_profile_' + owner);
+      const rawChat = localStorage.getItem('careermind_chat_' + owner);
+      return {
+        profile: rawProfile ? JSON.parse(rawProfile) as UserProfile : { ...INITIAL_PROFILE, name: '', assessmentCompleted: false, selectedCareerId: null, xp: 0, completedTasks: {} } as UserProfile,
+        chat: rawChat ? JSON.parse(rawChat) as ChatMessage[] : defaultChat
+      };
+    } catch {
+      return { profile: { ...INITIAL_PROFILE, name: '', assessmentCompleted: false, selectedCareerId: null, xp: 0, completedTasks: {} } as UserProfile, chat: defaultChat };
+    }
+  };
+
   const [chatInput, setChatInput] = useState('');
   const [isAiTyping, setIsAiTyping] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   useEffect(() => {
     if (!supabase) return;
     let mounted = true;
-    void supabase.auth.getSession().then(({ data }) => { if (mounted) setSession(data.session); });
+    void supabase.auth.getSession().then(({ data }) => { if (mounted) { setSession(data.session); setAuthReady(true); } }).catch(() => { if (mounted) setAuthReady(true); });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, next) => {
-      if (mounted) setSession(next);
+      if (mounted) { setSession(next); setAuthReady(true); }
     });
     return () => { mounted = false; subscription.unsubscribe(); };
   }, []);
+
+  useEffect(() => {
+    if (!authReady) return;
+    const owner = session?.user.id ?? 'guest';
+    if (owner === localDataOwner) return;
+    const stored = readScopedData(owner);
+    setProfile(stored.profile);
+    setChatMessages(stored.chat);
+    setLocalDataOwner(owner);
+  }, [authReady, session?.user.id, localDataOwner]);
 
   const saveProfileToCloud = async () => {
     if (!session) throw new Error('Avval tizimga kiring');
@@ -1387,19 +1418,19 @@ export default function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem('careermind_profile', JSON.stringify(profile));
+      if (authReady && localDataOwner === (session?.user.id ?? 'guest')) localStorage.setItem('careermind_profile_' + localDataOwner, JSON.stringify(profile));
     } catch (e) {
       console.error(e);
     }
-  }, [profile]);
+  }, [profile, session?.user.id, authReady, localDataOwner]);
 
   useEffect(() => {
     try {
-      localStorage.setItem('careermind_chat', JSON.stringify(chatMessages));
+      if (authReady && localDataOwner === (session?.user.id ?? 'guest')) localStorage.setItem('careermind_chat_' + localDataOwner, JSON.stringify(chatMessages));
     } catch (e) {
       console.error(e);
     }
-  }, [chatMessages]);
+  }, [chatMessages, session?.user.id, authReady, localDataOwner]);
 
   const t = TRANSLATIONS[lang];
 
@@ -3400,7 +3431,8 @@ export default function App() {
             </div>
             <button
               onClick={() => {
-                localStorage.clear();
+                localStorage.removeItem('careermind_profile_' + localDataOwner);
+                localStorage.removeItem('careermind_chat_' + localDataOwner);
                 setProfile(INITIAL_PROFILE);
                 setActiveTab('home');
               }}
