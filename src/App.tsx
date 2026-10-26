@@ -1333,8 +1333,42 @@ export default function App() {
     setLocalDataOwner(owner);
   }, [authReady, session?.user.id, localDataOwner]);
 
+  const [autoSaveConsent, setAutoSaveConsent] = useState(false);
+  const [profileSyncStatus, setProfileSyncStatus] = useState('');
+  const profileFields = [
+    Boolean(profile.name.trim()), profile.age > 0, Boolean(profile.educationLevel),
+    Boolean(profile.university.trim()), Boolean(profile.fieldOfStudy.trim()),
+    profile.interests.length > 0
+  ];
+  const profileCompletion = Math.round(profileFields.filter(Boolean).length / profileFields.length * 100);
+  const profileIsValid = profile.name.trim().length >= 2 && profile.age > 0 &&
+    Boolean(profile.educationLevel) && Boolean(profile.university.trim()) &&
+    Boolean(profile.fieldOfStudy.trim());
+  useEffect(() => {
+    setAutoSaveConsent(false);
+    setProfileSyncStatus('');
+  }, [session?.user.id]);
+  useEffect(() => {
+    if (!autoSaveConsent || !session || !profileIsValid ||
+        localDataOwner !== session.user.id || !authReady) return;
+    const currentUser = session.user.id;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        const { data: { user }, error: authError } = await requireSupabase().auth.getUser();
+        if (authError || !user || user.id !== currentUser) return;
+        const { error } = await requireSupabase().from('profiles').upsert({
+          user_id: currentUser, display_name: profile.name.trim(),
+          profile_data: profile, updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' });
+        setProfileSyncStatus(error ? 'Avtomatik saqlashda xatolik: ' + error.message : 'Profil avtomatik saqlandi');
+      })().catch(() => setProfileSyncStatus('Avtomatik saqlashda xatolik'));
+    }, 1600);
+    return () => window.clearTimeout(timer);
+  }, [profile, autoSaveConsent, session?.user.id, profileIsValid, authReady, localDataOwner]);
+
   const saveProfileToCloud = async () => {
     if (!session) throw new Error('Avval tizimga kiring');
+    if (!profileIsValid) throw new Error('Ism, yosh, ta’lim darajasi, ta’lim muassasasi va yo‘nalishni to‘ldiring');
     const { error } = await requireSupabase().from('profiles').upsert({
       user_id: session.user.id, display_name: profile.name, profile_data: profile,
       updated_at: new Date().toISOString()
@@ -3275,6 +3309,17 @@ export default function App() {
         </div>
 
         <AccountPanel session={session} onSession={setSession} onSaveProfile={saveProfileToCloud} onLoadProfile={loadProfileFromCloud} />
+        <div className="rounded-xl border border-cyan-500/30 bg-slate-900/70 p-4 space-y-3">
+          <div className="flex justify-between text-sm"><strong>Profil to‘liqligi</strong><span>{profileCompletion}%</span></div>
+          <div className="h-2 bg-slate-800 rounded-full overflow-hidden"><div className="h-2 bg-cyan-400 rounded-full" style={{width: profileCompletion + '%'}}/></div>
+          <p className="text-xs text-slate-400">Ism, yosh, ta’lim darajasi, muassasa, mutaxassislik va qiziqishlar hisoblanadi.</p>
+          {!profileIsValid && <p className="text-xs text-amber-300">Bulutga saqlash uchun ism (kamida 2 belgi), yosh, ta’lim darajasi, muassasa va mutaxassislikni kiriting.</p>}
+          {session && <label className="flex items-start gap-2 text-sm text-slate-200">
+            <input type="checkbox" checked={autoSaveConsent} onChange={e=>setAutoSaveConsent(e.target.checked)}/>
+            <span>Profilimni o‘zgartirganimda Supabase'ga avtomatik saqlashga roziman (istalgan vaqtda o‘chirish mumkin).</span>
+          </label>}
+          {profileSyncStatus && <p role="status" className="text-xs text-cyan-300">{profileSyncStatus}</p>}
+        </div>
         <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 sm:p-8 backdrop-blur-md space-y-6">
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
