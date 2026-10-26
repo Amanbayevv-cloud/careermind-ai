@@ -1289,7 +1289,7 @@ export default function App() {
   // Chat message state
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
 
-  // Keep cached profile//chat separate for each auth identity; never share guest data with accounts.
+  // Keep cached profile/chat separate for each auth identity; never share guest data with accounts.
   const [localDataOwner, setLocalDataOwner] = useState('guest');
   const [authReady, setAuthReady] = useState(false);
   const defaultChat: ChatMessage[] = [{
@@ -1299,8 +1299,8 @@ export default function App() {
   }];
   const readScopedData = (owner: string) => {
     try {
-      const rawProfile = localStorage.getItem('careermind_profile_' + owner);
-      const rawChat = localStorage.getItem('careermind_chat_' + owner);
+      const rawProfile = owner === 'guest' ? null : localStorage.getItem('careermind_profile_' + owner);
+      const rawChat = owner === 'guest' ? null : localStorage.getItem('careermind_chat_' + owner);
       return {
         profile: rawProfile ? JSON.parse(rawProfile) as UserProfile : { ...INITIAL_PROFILE },
         chat: rawChat ? JSON.parse(rawChat) as ChatMessage[] : defaultChat
@@ -1366,7 +1366,7 @@ export default function App() {
 
   useEffect(() => {
     try {
-      if (authReady && localDataOwner === (session?.user.id ?? 'guest')) localStorage.setItem('careermind_profile_' + localDataOwner, JSON.stringify(profile));
+      if (authReady && session && localDataOwner === session.user.id) localStorage.setItem('careermind_profile_' + localDataOwner, JSON.stringify(profile));
     } catch (e) {
       console.error(e);
     }
@@ -1374,7 +1374,7 @@ export default function App() {
 
   useEffect(() => {
     try {
-      if (authReady && localDataOwner === (session?.user.id ?? 'guest')) localStorage.setItem('careermind_chat_' + localDataOwner, JSON.stringify(chatMessages));
+      if (authReady && session && localDataOwner === session.user.id) localStorage.setItem('careermind_chat_' + localDataOwner, JSON.stringify(chatMessages));
     } catch (e) {
       console.error(e);
     }
