@@ -5,6 +5,7 @@ import ObjectiveAssessment from './components/ObjectiveAssessment';
 import AssessmentV3 from './components/AssessmentV3';
 import AdaptiveAssessment from './components/AdaptiveAssessment';
 import SmartRoadmap from './components/SmartRoadmap';
+import CareerMatchingV3 from './components/CareerMatchingV3';
 import { askCareerAI } from './services/careerBackend';
 import { requireSupabase, supabase } from './services/supabaseClient';
 import type { Session } from '@supabase/supabase-js';
@@ -3423,7 +3424,8 @@ export default function App() {
           {activeTab === 'assessmentV3' && <><div className="max-w-4xl mx-auto px-4 pt-6"><button onClick={() => setActiveTab('adaptiveAssessment')} className="bg-purple-700 hover:bg-purple-600 text-white rounded-xl px-5 py-3 font-bold">Adaptive Assessment 3.1 ni boshlash</button></div><AssessmentV3 session={session} /></>}
           {activeTab === 'adaptiveAssessment' && <AdaptiveAssessment session={session} />}
           {activeTab === 'dashboard' && renderDashboard()}
-          {activeTab === 'careers' && renderCareerDirectory()}
+          {activeTab === 'careers' && <><div className="max-w-5xl mx-auto px-4 pt-6"><button onClick={() => setActiveTab('careerMatchingV3')} className="bg-cyan-700 hover:bg-cyan-600 text-white rounded-xl px-5 py-3 font-bold">Career Matching 3.0 — aqlli tavsiyalar</button></div>{renderCareerDirectory()}</>}
+          {activeTab === 'careerMatchingV3' && <CareerMatchingV3 session={session} profile={{interests:profile.interests,skills:profile.skills}} careers={CAREER_DATABASE.map(c=>({id:c.id,title:c.titleKey,category:c.category,description:c.descriptionKey,requiredSkills:c.requiredSkills,associatedInterests:c.associatedInterests}))} onChoose={(id)=>{setProfile(p=>({...p,selectedCareerId:id}));setActiveTab('smartRoadmap');}} />}
           {activeTab === 'myCareer' && renderCareerDetails()}
           {activeTab === 'skillGap' && renderSkillGap()}
           {activeTab === 'roadmap' && <><div className="max-w-5xl mx-auto px-4 pt-6"><button onClick={() => setActiveTab('smartRoadmap')} className="px-5 py-3 rounded-xl bg-cyan-700 font-bold text-white">Smart Roadmap 2.0 ni ochish</button></div>{renderRoadmap()}</>}
