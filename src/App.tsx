@@ -4,6 +4,7 @@ import SupportPage from './components/SupportPage';
 import ObjectiveAssessment from './components/ObjectiveAssessment';
 import AssessmentV3 from './components/AssessmentV3';
 import AdaptiveAssessment from './components/AdaptiveAssessment';
+import SmartRoadmap from './components/SmartRoadmap';
 import { askCareerAI } from './services/careerBackend';
 import { requireSupabase, supabase } from './services/supabaseClient';
 import type { Session } from '@supabase/supabase-js';
@@ -3425,7 +3426,8 @@ export default function App() {
           {activeTab === 'careers' && renderCareerDirectory()}
           {activeTab === 'myCareer' && renderCareerDetails()}
           {activeTab === 'skillGap' && renderSkillGap()}
-          {activeTab === 'roadmap' && renderRoadmap()}
+          {activeTab === 'roadmap' && <><div className="max-w-5xl mx-auto px-4 pt-6"><button onClick={() => setActiveTab('smartRoadmap')} className="px-5 py-3 rounded-xl bg-cyan-700 font-bold text-white">Smart Roadmap 2.0 ni ochish</button></div>{renderRoadmap()}</>}
+          {activeTab === 'smartRoadmap' && <SmartRoadmap session={session} career={selectedCareer.titleKey} />}
           {activeTab === 'compare' && renderCareerComparison()}
           {activeTab === 'assistant' && renderAiAssistant()}
           {activeTab === 'profile' && renderProfile()}
