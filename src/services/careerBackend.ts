@@ -1,3 +1,4 @@
+import { requireSupabase } from './supabaseClient';
 /** API adapters for the upcoming UI integration. Never put provider secrets in Vite variables. */
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -27,12 +28,15 @@ export function signIn(email: string, password: string) {
 export function askCareerAI(message: string, accessToken: string, context = '') {
   return post<{ reply: string }>('/functions/v1/career-chat', { message, context }, accessToken);
 }
-export async function saveAssessment(accessToken: string, answers: unknown, results: unknown) {
-  const config = configured();
-  const response = await fetch(config.url + '/rest/v1/assessment_attempts', {
-    method: 'POST',
-    headers: { apikey: config.anonKey, Authorization: 'Bearer ' + accessToken, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-    body: JSON.stringify({ answers, results, version: '2.0' })
+export async function saveAssessment(_accessToken: string, answers: unknown, results: unknown) {
+  const client = requireSupabase();
+  const { data: { user }, error: authError } = await client.auth.getUser();
+  if (authError || !user) throw new Error('Sessiya topilmadi. Qayta login qiling.');
+  const { error } = await client.from('assessment_attempts').insert({
+    user_id: user.id,
+    answers,
+    results,
+    version: '2.0'
   });
-  if (!response.ok) throw new Error('Assessment could not be saved');
+  if (error) throw new Error('Natijani saqlashda xatolik: ' + error.message);
 }
