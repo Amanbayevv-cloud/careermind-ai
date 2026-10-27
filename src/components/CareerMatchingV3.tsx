@@ -37,6 +37,7 @@ export default function CareerMatchingV3({session,profile,careers,onChoose}:{ses
   })().catch(e=>{if(alive){setNotice(String(e));setLoading(false);}});
   return ()=>{alive=false;};
  },[session?.user.id]);
+ const hasEnoughData = Object.values(profile.skills).filter(value => value > 0).length >= 3 && profile.interests.length > 0;
  const ranked=useMemo(()=>careers.map(c=>rate(c,profile,test)).sort((a,b)=>b.score-a.score).slice(0,5),[careers,profile,test]);
  return <main className="max-w-5xl mx-auto px-4 py-8 space-y-6">
   <header><h1 className="text-2xl font-black text-white">Career Matching 3.0</h1>
@@ -48,7 +49,8 @@ export default function CareerMatchingV3({session,profile,careers,onChoose}:{ses
    Hisoblash usuli: {test?'45% ko‘nikmalar + 25% qiziqishlar + 30% test':'65% ko‘nikmalar + 35% qiziqishlar'}.
    Bu dastlabki evristik formula bo‘lib, ilmiy jihatdan kalibrlanmagan.
   </div>
-  {ranked.map((m,i)=><article key={m.career.id} className="bg-slate-900/80 border border-slate-700 rounded-2xl p-5 space-y-3">
+  {!hasEnoughData && <p className="rounded-xl border border-amber-700 bg-amber-950/30 p-4 text-sm text-amber-200">Moslikni hisoblash uchun Profil yoki Test bo‘limida kamida 3 ta ko‘nikma va 1 ta qiziqishni kiriting. Hozir kasblar haqida umumiy ma’lumotlarni ko‘rishingiz mumkin.</p>}
+  {hasEnoughData && ranked.map((m,i)=><article key={m.career.id} className="bg-slate-900/80 border border-slate-700 rounded-2xl p-5 space-y-3">
     <div className="flex flex-wrap justify-between gap-3"><div><div className="text-xs text-cyan-300">#{i+1} · {m.career.category}</div>
      <h2 className="font-bold text-white text-xl">{m.career.title}</h2></div><strong className="text-cyan-300 text-2xl">{m.score}%</strong></div>
     <div className="bg-slate-800 rounded-full h-2"><div className="h-2 bg-cyan-400 rounded-full" style={{width:`${m.score}%`}}/></div>
