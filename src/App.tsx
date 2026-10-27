@@ -26,7 +26,6 @@ import {
   User,
   Settings as SettingsIcon,
   Flame,
-  Award,
   Zap,
   Search,
   Check,
@@ -1276,6 +1275,8 @@ export default function App() {
 
   const [activeTab, setActiveTab] = useState<string>('home');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Persistence of Profile
   const [profile, setProfile] = useState<UserProfile>(INITIAL_PROFILE);
@@ -1461,10 +1462,6 @@ export default function App() {
       xp: newXp,
       unlockedBadges: updatedBadges
     }));
-  };
-
-  const calculateLevel = (xp: number) => {
-    return Math.floor(xp / 200) + 1;
   };
 
   const handleSendMessage = async (textToSend?: string) => {
