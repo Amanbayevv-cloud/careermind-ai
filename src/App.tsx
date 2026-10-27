@@ -1550,12 +1550,23 @@ export default function App() {
     }, 850);
   };
 
+  const activeSection = ({
+    dashboardV2: 'dashboard', assessmentV3: 'assessment', adaptiveAssessment: 'assessment',
+    careerMatchingV3: 'careers', myCareer: 'careers',
+    smartRoadmap: 'roadmap'
+  } as Record<string, string>)[activeTab] || activeTab;
+  const navigateTo = (tab: string) => {
+    setActiveTab(tab);
+    setMobileMenuOpen(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const renderNavbar = () => (
     <header className="sticky top-0 z-50 backdrop-blur-xl bg-slate-950/80 border-b border-slate-800/80 transition-all">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         {/* Brand */}
         <div 
-          onClick={() => setActiveTab('home')}
+          onClick={() => navigateTo('home')}
           className="flex items-center space-x-3 cursor-pointer group select-none"
         >
           <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-cyan-400 p-0.5 shadow-lg shadow-indigo-500/20 group-hover:shadow-indigo-500/40 transition">
@@ -1574,7 +1585,7 @@ export default function App() {
         </div>
 
         {/* Desktop Navigation */}
-        <nav className="hidden xl:flex items-center space-x-1">
+        <nav aria-label="Asosiy navigatsiya" className="hidden xl:flex items-center space-x-1">
           {[
             { id: 'home', label: t.home, icon: Compass },
             { id: 'dashboard', label: t.dashboard, icon: BarChart3 },
@@ -1586,14 +1597,15 @@ export default function App() {
             { id: 'assistant', label: t.aiAssistant, icon: Bot }
           ].map((item) => {
             const Icon = item.icon;
-            const isActive = activeTab === item.id;
+            const isActive = activeSection === item.id;
             return (
               <button
                 key={item.id}
                 onClick={() => {
-                  setActiveTab(item.id);
+                  navigateTo(item.id);
                   if (item.id === 'myCareer') setInspectedCareerId(profile.selectedCareerId || 'ai-engineer');
                 }}
+                aria-current={isActive ? 'page' : undefined}
                 className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
                   isActive
                     ? 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-cyan-300 border border-indigo-500/40 shadow-sm'
@@ -1639,12 +1651,12 @@ export default function App() {
             ))}
           </div>
 
-          <button onClick={() => setActiveTab('support')}
+          <button onClick={() => navigateTo('support')}
             className={`px-3 py-2 rounded-lg text-xs border ${activeTab === 'support' ? 'bg-indigo-600/30 border-indigo-500 text-cyan-300' : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white'}`}
             title="Qo‘llab-quvvatlash">Yordam</button>
           {/* User Profile / Settings */}
           <button
-            onClick={() => setActiveTab('profile')}
+            onClick={() => navigateTo('profile')}
             className={`p-2 rounded-lg border transition ${
               activeTab === 'profile'
                 ? 'bg-indigo-600/30 border-indigo-500 text-cyan-300'
@@ -1656,7 +1668,7 @@ export default function App() {
           </button>
 
           <button
-            onClick={() => setActiveTab('settings')}
+            onClick={() => navigateTo('settings')}
             className={`p-2 rounded-lg border transition ${
               activeTab === 'settings'
                 ? 'bg-indigo-600/30 border-indigo-500 text-cyan-300'
@@ -1669,7 +1681,10 @@ export default function App() {
 
           {/* Mobile Menu Button */}
           <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            onClick={() => setMobileMenuOpen(open => !open)}
+            aria-label={mobileMenuOpen ? 'Menyuni yopish' : 'Menyuni ochish'}
+            aria-expanded={mobileMenuOpen}
+            aria-controls="careermind-mobile-nav"
             className="xl:hidden p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-300"
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -1679,7 +1694,7 @@ export default function App() {
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="xl:hidden bg-slate-950/95 border-b border-slate-800 px-4 pt-2 pb-6 space-y-2 backdrop-blur-2xl">
+        <div id="careermind-mobile-nav" role="navigation" aria-label="Mobil navigatsiya" className="xl:hidden max-h-[calc(100dvh-4rem)] overflow-y-auto bg-slate-950/95 border-b border-slate-800 px-4 pt-2 pb-6 space-y-2 backdrop-blur-2xl">
           {[
             { id: 'home', label: t.home, icon: Compass },
             { id: 'dashboard', label: t.dashboard, icon: BarChart3 },
@@ -1694,14 +1709,14 @@ export default function App() {
             { id: 'settings', label: t.settings, icon: SettingsIcon }
           ].map((item) => {
             const Icon = item.icon;
-            const isActive = activeTab === item.id;
+            const isActive = activeSection === item.id;
             return (
               <button
                 key={item.id}
                 onClick={() => {
-                  setActiveTab(item.id);
-                  setMobileMenuOpen(false);
+                  navigateTo(item.id);
                 }}
+                aria-current={isActive ? 'page' : undefined}
                 className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium ${
                   isActive
                     ? 'bg-indigo-600/30 text-cyan-300 border border-indigo-500/40'
@@ -3448,7 +3463,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-cyan-500 selection:text-slate-950 flex flex-col justify-between">
+    <div className="min-h-screen overflow-x-hidden bg-slate-950 text-slate-100 font-sans selection:bg-cyan-500 selection:text-slate-950 flex flex-col justify-between pb-20 xl:pb-0">
       <div>
         {renderNavbar()}
 
@@ -3475,6 +3490,20 @@ export default function App() {
           {activeTab === 'settings' && renderSettings()}
           {activeTab === 'support' && <SupportPage session={session} onGoProfile={() => setActiveTab('profile')} />}
         </main>}
+        <nav aria-label="Tezkor mobil navigatsiya" className="xl:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-4 gap-1 border-t border-slate-700 bg-slate-950/95 px-2 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur-xl">
+          {[
+            { id: 'home', label: 'Bosh sahifa', icon: Compass },
+            { id: 'assessment', label: 'Test', icon: BrainCircuit },
+            { id: 'dashboard', label: 'Natijalar', icon: BarChart3 },
+            { id: 'profile', label: 'Profil', icon: User }
+          ].map(({id,label,icon: Icon}) => (
+            <button key={id} type="button" aria-current={activeSection === id ? 'page' : undefined}
+              onClick={() => navigateTo(id)}
+              className={`flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[11px] font-semibold transition-colors ${activeSection === id ? 'bg-indigo-600/30 text-cyan-300' : 'text-slate-400 hover:bg-slate-800'}`}>
+              <Icon className="h-5 w-5" aria-hidden="true"/><span>{label}</span>
+            </button>
+          ))}
+        </nav>
       </div>
     </div>
   );
