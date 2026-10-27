@@ -2,11 +2,14 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { requireSupabase } from '../services/supabaseClient';
 import { DOMAIN_LABELS, DOMAINS_V3, type Domain3 } from '../assessment/assessmentV3';
+import type { UiLanguage } from '../services/matchTranslations';
 import { rankCareers, hasMatchingData, type MatchProfile, type MatchCareer, type MatchTest } from '../services/careerMatching';
 
 type Attempt = {id:string;created_at:string;version:string;results:{scores?:Partial<Record<Domain3,{percent:number}>>;recommendations?:{career:string;score:number}[]}};
 type Roadmap = {career_id:string;duration_months:number;plan_data:unknown;completed_tasks:unknown;updated_at:string};
-export default function DashboardV2({session,onGo,profile,careers,selectedCareer}:{session:Session|null;onGo:(page:string)=>void;profile:MatchProfile;careers:MatchCareer[];selectedCareer:string|null}) {
+export default function DashboardV2({session,onGo,profile,careers,selectedCareer,lang}:{session:Session|null;onGo:(page:string)=>void;profile:MatchProfile;careers:MatchCareer[];selectedCareer:string|null;lang:UiLanguage}) {
+ const labels = {"uz":["{tr(0)}","{tr(1)}","{tr(2)}","{tr(3)}","{tr(4)}","{tr(5)}","{tr(6)}","{tr(7)}","{tr(8)}","{tr(9)}","{tr(10)}","{tr(11)}"],"ru":["Панель 3.0","Тесты, рекомендации и прогресс обучения в одном месте.","Обновить","Сохранённые тесты","Планы обучения","Прогресс последнего плана","Последний тест","Рекомендованные профессии","Динамика результатов","Учебный план","Перейти к тесту","Пока есть только один тест. После следующего результаты можно будет сравнить."],"en":["Dashboard 3.0","Assessments, career recommendations, and learning progress in one place.","Refresh","Saved assessments","Learning plans","Latest plan progress","Latest assessment results","Recommended careers","Assessment history","Smart Roadmap","Take assessment","Only one assessment is available. You can compare results after another assessment."]}[lang];
+ const tr=(i:number)=>labels[i];
  const [attempts,setAttempts]=useState<Attempt[]>([]);
  const [roadmaps,setRoadmaps]=useState<Roadmap[]>([]);
  const [loading,setLoading]=useState(false);
