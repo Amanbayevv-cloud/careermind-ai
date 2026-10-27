@@ -1584,41 +1584,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Desktop Navigation */}
-        <nav aria-label="Asosiy navigatsiya" className="hidden xl:flex items-center space-x-1">
-          {[
-            { id: 'home', label: t.home, icon: Compass },
-            { id: 'dashboard', label: t.dashboard, icon: BarChart3 },
-            { id: 'assessment', label: t.assessment, icon: Sliders },
-            { id: 'careers', label: t.careers, icon: Briefcase },
-            { id: 'skillGap', label: t.skillGap, icon: Target },
-            { id: 'roadmap', label: t.roadmap, icon: BookOpen },
-            { id: 'compare', label: t.compare, icon: Scale },
-            { id: 'assistant', label: t.aiAssistant, icon: Bot }
-          ].map((item) => {
-            const Icon = item.icon;
-            const isActive = activeSection === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  navigateTo(item.id);
-                  if (item.id === 'myCareer') setInspectedCareerId(profile.selectedCareerId || 'ai-engineer');
-                }}
-                aria-current={isActive ? 'page' : undefined}
-                className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
-                  isActive
-                    ? 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-cyan-300 border border-indigo-500/40 shadow-sm'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
-                }`}
-              >
-                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-cyan-400' : 'text-slate-400'}`} />
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-
         {/* Status Badges, Lang Switcher & Mobile Menu Trigger */}
         <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           {/* XP & Streak */}
@@ -1690,6 +1655,44 @@ export default function App() {
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
+      </div>
+
+      <div className="hidden xl:block border-t border-slate-800/70 bg-slate-950/70">
+        {/* Desktop Navigation */}
+        <nav aria-label="Asosiy navigatsiya" className="hidden xl:flex max-w-7xl mx-auto items-center justify-center gap-2 px-4 py-2">
+          {[
+            { id: 'home', label: t.home, icon: Compass },
+            { id: 'dashboard', label: t.dashboard, icon: BarChart3 },
+            { id: 'assessment', label: t.assessment, icon: Sliders },
+            { id: 'careers', label: t.careers, icon: Briefcase },
+            { id: 'skillGap', label: t.skillGap, icon: Target },
+            { id: 'roadmap', label: t.roadmap, icon: BookOpen },
+            { id: 'compare', label: t.compare, icon: Scale },
+            { id: 'assistant', label: t.aiAssistant, icon: Bot }
+          ].map((item) => {
+            const Icon = item.icon;
+            const isActive = activeSection === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => {
+                  navigateTo(item.id);
+                  if (item.id === 'myCareer') setInspectedCareerId(profile.selectedCareerId || 'ai-engineer');
+                }}
+                aria-current={isActive ? 'page' : undefined}
+                className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                  isActive
+                    ? 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-cyan-300 border border-indigo-500/40 shadow-sm'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
+                <Icon className={`w-4 h-4 ${isActive ? 'text-cyan-400' : 'text-slate-400'}`} />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+
       </div>
 
       {/* Mobile Drawer */}
