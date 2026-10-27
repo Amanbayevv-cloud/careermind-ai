@@ -1257,7 +1257,7 @@ function calculateCareerScores(profile: UserProfile): { career: CareerRequiremen
 
     return {
       career,
-      matchScore: Math.min(99, Math.max(48, totalMatch)),
+      matchScore: Math.min(99, Math.max(0, totalMatch)),
       strengths: strengths.slice(0, 3),
       missingSkills: missingSkills.slice(0, 3)
     };
@@ -1417,6 +1417,12 @@ export default function App() {
 
   const t = TRANSLATIONS[lang];
 
+  // Require substantive profile input before displaying fit estimates.
+  const hasCareerAssessment = Object.values(profile.skills).filter(v => v > 0).length >= 3
+    && Object.values(profile.personality).filter(v => v > 0).length >= 3
+    && profile.interests.length > 0 && Boolean(profile.careerGoal);
+  const displayMatch = (score: number) => hasCareerAssessment ? score + '%' : 'Baholanmagan';
+
   // Calculated Matches
   const careerScores = useMemo(() => {
     return calculateCareerScores(profile);
@@ -1424,7 +1430,7 @@ export default function App() {
 
   const bestMatch = careerScores[0] || {
     career: CAREER_DATABASE[0],
-    matchScore: 90,
+    matchScore: 0,
     strengths: ['programming', 'problemSolving'],
     missingSkills: ['mathematics']
   };
@@ -1506,7 +1512,7 @@ export default function App() {
 
       if (lang === 'uz') {
         if (lower.includes('mos') || lower.includes('qaysi kasb') || lower.includes('tavsiya')) {
-          replyText = `Sizning javoblaringiz tahlili bo'yicha sizga eng mos kasb — **${topCareer}** (${bestMatch.matchScore}% moslik). Kuchli tomonlaringiz: ${bestMatch.strengths.join(', ')}. Ushbu yo'nalish sizning ${profile.preferences.workType} formatidagi ishlash xohishingizga to'liq javob beradi.`;
+          replyText = `Sizning javoblaringiz tahlili bo'yicha sizga eng mos kasb — **${topCareer}** (${displayMatch(bestMatch.matchScore)} moslik). Kuchli tomonlaringiz: ${bestMatch.strengths.join(', ')}. Ushbu yo'nalish sizning ${profile.preferences.workType} formatidagi ishlash xohishingizga to'liq javob beradi.`;
         } else if (lower.includes('nimani') || lower.includes("o'rganish") || lower.includes('oy')) {
           replyText = `Rejangiz bo'yicha 1-oyda asosiy e'tiborni **${selectedCareer.roadmapMonths[0]?.title}**ga qaratish lozim. Hozirda sizda ${bestMatch.missingSkills.join(' va ')} bo'yicha bilimlarni kuchaytirish ustuvor vazifadir. Kuniga 45 daqiqa ajratib, yo'l xaritasidagi 1-vazifani bajaring!`;
         } else if (lower.includes('masofaviy') || lower.includes('remote') || lower.includes('dollar') || lower.includes('maosh')) {
@@ -1518,7 +1524,7 @@ export default function App() {
         }
       } else if (lang === 'ru') {
         if (lower.includes('подходит') || lower.includes('профессия') || lower.includes('лучше')) {
-          replyText = `Исходя из вашего профиля, наилучшая совместимость у специальности **${topCareer}** (${bestMatch.matchScore}%). Ваши ключевые преимущества: ${bestMatch.strengths.join(', ')}. Это полностью отвечает вашей цели: ${profile.careerGoal}.`;
+          replyText = `Исходя из вашего профиля, наилучшая совместимость у специальности **${topCareer}** (${displayMatch(bestMatch.matchScore)}). Ваши ключевые преимущества: ${bestMatch.strengths.join(', ')}. Это полностью отвечает вашей цели: ${profile.careerGoal}.`;
         } else if (lower.includes('учить') || lower.includes('навыки') || lower.includes('месяц')) {
           replyText = `Вам рекомендуется сфокусироваться на первом месяце роадмапа: **${selectedCareer.roadmapMonths[0]?.title}**. Главная зона роста сейчас — ${bestMatch.missingSkills.join(', ')}. Выполняйте интерактивные чек-листы в разделе "План обучения".`;
         } else if (lower.includes('удален') || lower.includes('зарплат') || lower.includes('remote')) {
@@ -1528,7 +1534,7 @@ export default function App() {
         }
       } else {
         if (lower.includes('best') || lower.includes('fit') || lower.includes('career')) {
-          replyText = `Based on your diagnostic profile, your top career match is **${topCareer}** at **${bestMatch.matchScore}% compatibility**. Your strongest pillars are ${bestMatch.strengths.join(', ')}.`;
+          replyText = `Based on your diagnostic profile, your top career match is **${topCareer}** at **${displayMatch(bestMatch.matchScore)} compatibility**. Your strongest pillars are ${bestMatch.strengths.join(', ')}.`;
         } else if (lower.includes('learn') || lower.includes('month') || lower.includes('first')) {
           replyText = `For Month 1, prioritize: **${selectedCareer.roadmapMonths[0]?.title}**. You should primarily bridge the gap in ${bestMatch.missingSkills.join(' and ')}. Check out the tasks in your Learning Roadmap!`;
         } else if (lower.includes('remote') || lower.includes('salary') || lower.includes('earn')) {
@@ -2446,7 +2452,7 @@ export default function App() {
 
             <div className="flex items-center gap-4 bg-slate-900/80 border border-slate-800 p-4 rounded-2xl">
               <div className="text-center px-2">
-                <div className="text-2xl font-black text-cyan-400">{bestMatch.matchScore}%</div>
+                <div className="text-2xl font-black text-cyan-400">{displayMatch(bestMatch.matchScore)}</div>
                 <div className="text-[11px] text-slate-400 font-semibold">{t.matchScore}</div>
               </div>
               <div className="w-px h-10 bg-slate-800" />
@@ -2496,7 +2502,7 @@ export default function App() {
                       <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">
                         Rank #{idx + 1}
                       </span>
-                      <span className="text-sm font-black text-cyan-300">{item.matchScore}% moslik</span>
+                      <span className="text-sm font-black text-cyan-300">{displayMatch(item.matchScore)} moslik</span>
                     </div>
 
                     <h4 className="text-base font-bold text-white mt-1.5">{item.career.titleKey}</h4>
@@ -2718,7 +2724,7 @@ export default function App() {
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filtered.map((career) => {
             const scoreObj = careerScores.find(cs => cs.career.id === career.id);
-            const score = scoreObj ? scoreObj.matchScore : 75;
+            const score = scoreObj ? scoreObj.matchScore : 0;
 
             return (
               <div
@@ -2731,7 +2737,7 @@ export default function App() {
                       {career.category}
                     </span>
                     <span className="text-xs font-black text-cyan-300 px-2 py-0.5 rounded bg-cyan-950/60 border border-cyan-800/40">
-                      {score}% {t.matchScore}
+                      {displayMatch(score)} {t.matchScore}
                     </span>
                   </div>
 
@@ -2792,7 +2798,7 @@ export default function App() {
   const renderCareerDetails = () => {
     const career = inspectedCareer;
     const scoreObj = careerScores.find(cs => cs.career.id === career.id);
-    const score = scoreObj ? scoreObj.matchScore : 80;
+    const score = scoreObj ? scoreObj.matchScore : 0;
     const isCurrentActive = profile.selectedCareerId === career.id;
 
     return (
@@ -2809,7 +2815,7 @@ export default function App() {
             </div>
 
             <div className="flex flex-col items-center bg-slate-950 p-4 rounded-2xl border border-slate-800 min-w-[130px]">
-              <span className="text-3xl font-black text-cyan-400">{score}%</span>
+              <span className="text-3xl font-black text-cyan-400">{displayMatch(score)}</span>
               <span className="text-[10px] text-slate-400 font-semibold mt-0.5">{t.matchScore}</span>
             </div>
           </div>
@@ -3277,10 +3283,10 @@ export default function App() {
               <tr>
                 <td className="p-4 text-slate-400 font-medium">Moslik ko'rsatkichi</td>
                 {selectedCareers.map(c => {
-                  const s = careerScores.find(item => item.career.id === c.id)?.matchScore || 70;
+                  const s = careerScores.find(item => item.career.id === c.id)?.matchScore ?? 0;
                   return (
                     <td key={c.id} className="p-4 font-black text-cyan-400 text-sm">
-                      {s}%
+                      {displayMatch(s)}
                     </td>
                   );
                 })}
