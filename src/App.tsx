@@ -2681,7 +2681,7 @@ export default function App() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         <div>
           <h2 className="text-2xl font-black text-white">{t.careers}</h2>
-          <p className="text-xs text-slate-400 mt-1">Bozorda yuqori talabga ega bo'lgan zamonaviy yo'nalishlar katalogi.</p>
+          <p className="text-xs text-slate-400 mt-1">Kasb yo‘nalishlari katalogi. Quyidagi maosh, masofaviy ish va o‘sish raqamlari tasdiqlanmagan namuna qiymatlar; qaror qabul qilish uchun ularga tayanmang.</p>
         </div>
 
         {/* Filter & Search Bar */}
@@ -2746,15 +2746,15 @@ export default function App() {
                   <div className="mt-5 space-y-2 text-xs">
                     <div className="flex justify-between text-slate-300">
                       <span className="text-slate-500">{t.salaryRange}:</span>
-                      <span className="font-semibold text-white">{career.baseSalary}</span>
+                      <span className="font-semibold text-white">Namuna: {career.baseSalary}</span>
                     </div>
                     <div className="flex justify-between text-slate-300">
                       <span className="text-slate-500">{t.remotePotential}:</span>
-                      <span className="font-semibold text-cyan-400">{career.remoteScore}%</span>
+                      <span className="font-semibold text-cyan-400">Namuna: {career.remoteScore}%</span>
                     </div>
                     <div className="flex justify-between text-slate-300">
                       <span className="text-slate-500">{t.growthForecast}:</span>
-                      <span className="font-semibold text-emerald-400">{career.growthRate}</span>
+                      <span className="font-semibold text-emerald-400">Namuna: {career.growthRate}</span>
                     </div>
                   </div>
                 </div>
@@ -2921,16 +2921,21 @@ export default function App() {
         </div>
 
         <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 sm:p-8 backdrop-blur-md space-y-6">
+          <p className="text-xs text-slate-400">Ko‘nikma hali baholanmagan bo‘lsa, 0 yoki 1 ball deb hisoblanmaydi. Profil yoki test orqali baholang.</p>
           <div className="grid gap-5">
             {Object.entries(career.requiredSkills).map(([skillKey, requiredVal]) => {
-              const userVal = profile.skills[skillKey as keyof SkillRatings] || 1;
+              const userVal = profile.skills[skillKey as keyof SkillRatings] ?? 0;
+              const isUnrated = userVal <= 0;
               const delta = userVal - (requiredVal || 5);
               const isMedium = delta === -1 || delta === -2;
               const isWeak = delta < -2;
 
               let statusLabel = t.strong;
               let statusColor = "text-emerald-400 bg-emerald-950/60 border-emerald-800/40";
-              if (isMedium) {
+              if (isUnrated) {
+                statusLabel = "Baholanmagan";
+                statusColor = "text-slate-300 bg-slate-800 border-slate-700";
+              } else if (isMedium) {
                 statusLabel = t.medium;
                 statusColor = "text-amber-400 bg-amber-950/60 border-amber-800/40";
               } else if (isWeak) {
@@ -2946,7 +2951,7 @@ export default function App() {
                         {skillKey.replace(/([A-Z])/g, ' $1')}
                       </span>
                       <span className="text-[11px] text-slate-500 ml-2">
-                        (Siz: {userVal}/10 vs Talab: {requiredVal}/10)
+                        (Siz: {isUnrated ? "Baholanmagan" : `${userVal}/10`} vs Talab: {requiredVal}/10)
                       </span>
                     </div>
 
@@ -2961,7 +2966,7 @@ export default function App() {
                     <div>
                       <div className="flex justify-between text-slate-400 mb-0.5">
                         <span>{t.userCurrent}</span>
-                        <span>{userVal * 10}%</span>
+                        <span>{isUnrated ? "Baholanmagan" : `${userVal * 10}%`}</span>
                       </div>
                       <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden">
                         <div
@@ -2987,7 +2992,7 @@ export default function App() {
                   </div>
 
                   {/* Recommendation action */}
-                  {isWeak && (
+                  {isWeak && !isUnrated && (
                     <div className="mt-3 pt-2 text-[11px] text-rose-300 flex items-center space-x-1.5">
                       <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
                       <span>Tavsiya: Ushbu soha bo'yicha amaliy topshiriqlarni yo'l xaritasida 1-o'ringa qo'ying.</span>
@@ -3222,6 +3227,7 @@ export default function App() {
         <div>
           <h2 className="text-2xl font-black text-white">{t.compareTitle}</h2>
           <p className="text-xs text-slate-400 mt-1">{t.compareSubtitle}</p>
+          <p className="text-xs text-amber-300 mt-2">Maosh, talab, masofaviy ish va o‘sish ko‘rsatkichlari tasdiqlanmagan namuna qiymatlar — real bozor statistikasi emas.</p>
         </div>
 
         {/* Selection Checkboxes */}
