@@ -2814,6 +2814,7 @@ export default function App() {
             </div>
           </div>
 
+          <p className="mt-5 text-xs text-amber-300">Quyidagi bozor ko‘rsatkichlari manbasi tasdiqlanmagan namunaviy qiymatlar. Haqiqiy maosh va ish bozori ko‘rsatkichlari hudud hamda tajribaga qarab farqlanadi.</p>
           {/* Quick Metrics */}
           <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-4 pt-6 border-t border-slate-800/80 text-xs">
             <div>
