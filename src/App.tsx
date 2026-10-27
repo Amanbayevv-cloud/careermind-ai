@@ -2752,15 +2752,15 @@ export default function App() {
                   <div className="mt-5 space-y-2 text-xs">
                     <div className="flex justify-between text-slate-300">
                       <span className="text-slate-500">{t.salaryRange}:</span>
-                      <span className="font-semibold text-white">Namuna: {career.baseSalary}</span>
+                      <span className="font-semibold text-white">Manba kutilmoqda</span>
                     </div>
                     <div className="flex justify-between text-slate-300">
                       <span className="text-slate-500">{t.remotePotential}:</span>
-                      <span className="font-semibold text-cyan-400">Namuna: {career.remoteScore}%</span>
+                      <span className="font-semibold text-cyan-400">Manba kutilmoqda</span>
                     </div>
                     <div className="flex justify-between text-slate-300">
                       <span className="text-slate-500">{t.growthForecast}:</span>
-                      <span className="font-semibold text-emerald-400">Namuna: {career.growthRate}</span>
+                      <span className="font-semibold text-emerald-400">Manba kutilmoqda</span>
                     </div>
                   </div>
                 </div>
@@ -2825,19 +2825,19 @@ export default function App() {
           <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-4 pt-6 border-t border-slate-800/80 text-xs">
             <div>
               <span className="text-slate-500 block">{t.salaryRange}</span>
-              <span className="font-bold text-white mt-0.5 block">{career.baseSalary}</span>
+              <span className="font-bold text-white mt-0.5 block">Manba kutilmoqda</span>
             </div>
             <div>
               <span className="text-slate-500 block">{t.demandLevel}</span>
-              <span className="font-bold text-emerald-400 mt-0.5 block">{career.demand}</span>
+              <span className="font-bold text-emerald-400 mt-0.5 block">Manba kutilmoqda</span>
             </div>
             <div>
               <span className="text-slate-500 block">{t.remotePotential}</span>
-              <span className="font-bold text-cyan-400 mt-0.5 block">{career.remoteScore}%</span>
+              <span className="font-bold text-cyan-400 mt-0.5 block">Manba kutilmoqda</span>
             </div>
             <div>
               <span className="text-slate-500 block">{t.growthForecast}</span>
-              <span className="font-bold text-purple-400 mt-0.5 block">{career.growthRate}</span>
+              <span className="font-bold text-purple-400 mt-0.5 block">Manba kutilmoqda</span>
             </div>
           </div>
 
@@ -3295,7 +3295,7 @@ export default function App() {
                 <td className="p-4 text-slate-400 font-medium">{t.salaryRange}</td>
                 {selectedCareers.map(c => (
                   <td key={c.id} className="p-4 font-semibold text-white">
-                    {c.baseSalary}
+                    Manba kutilmoqda
                   </td>
                 ))}
               </tr>
@@ -3303,7 +3303,7 @@ export default function App() {
                 <td className="p-4 text-slate-400 font-medium">{t.demandLevel}</td>
                 {selectedCareers.map(c => (
                   <td key={c.id} className="p-4 font-semibold text-emerald-400">
-                    {c.demand}
+                    Manba kutilmoqda
                   </td>
                 ))}
               </tr>
@@ -3311,7 +3311,7 @@ export default function App() {
                 <td className="p-4 text-slate-400 font-medium">{t.remotePotential}</td>
                 {selectedCareers.map(c => (
                   <td key={c.id} className="p-4 font-semibold text-cyan-400">
-                    {c.remoteScore}%
+                    Manba kutilmoqda
                   </td>
                 ))}
               </tr>
@@ -3327,7 +3327,7 @@ export default function App() {
                 <td className="p-4 text-slate-400 font-medium">{t.growthForecast}</td>
                 {selectedCareers.map(c => (
                   <td key={c.id} className="p-4 font-semibold text-slate-200">
-                    {c.growthRate}
+                    Manba kutilmoqda
                   </td>
                 ))}
               </tr>
