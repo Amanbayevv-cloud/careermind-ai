@@ -1563,22 +1563,22 @@ export default function App() {
 
   const renderNavbar = () => (
     <header className="sticky top-0 z-50 backdrop-blur-xl bg-slate-950/80 border-b border-slate-800/80 transition-all">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2">
         {/* Brand */}
         <div 
           onClick={() => navigateTo('home')}
-          className="flex items-center space-x-3 cursor-pointer group select-none"
+          className="flex min-w-0 shrink items-center gap-2 sm:gap-3 cursor-pointer group select-none"
         >
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-cyan-400 p-0.5 shadow-lg shadow-indigo-500/20 group-hover:shadow-indigo-500/40 transition">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-cyan-400 p-0.5 shadow-lg shadow-indigo-500/20 group-hover:shadow-indigo-500/40 transition">
             <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
               <BrainCircuit className="w-5 h-5 text-cyan-400 group-hover:scale-110 transition duration-300" />
             </div>
           </div>
           <div>
-            <span className="font-extrabold text-xl tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+            <span className="font-extrabold text-sm sm:text-xl tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
               CareerMind <span className="text-cyan-400 font-mono">AI</span>
             </span>
-            <div className="text-[10px] text-slate-400 tracking-wider uppercase font-semibold">
+            <div className="hidden sm:block text-[10px] text-slate-400 tracking-wider uppercase font-semibold">
               Guidance System
             </div>
           </div>
@@ -1620,7 +1620,7 @@ export default function App() {
         </nav>
 
         {/* Status Badges, Lang Switcher & Mobile Menu Trigger */}
-        <div className="flex items-center space-x-3">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           {/* XP & Streak */}
           <div className="hidden sm:flex items-center space-x-2 bg-slate-900/90 border border-slate-800 rounded-full px-3 py-1 text-xs">
             <div className="flex items-center space-x-1 text-amber-400 font-semibold">
@@ -1635,12 +1635,12 @@ export default function App() {
           </div>
 
           {/* Lang Selector */}
-          <div className="relative flex items-center bg-slate-900 border border-slate-800 rounded-lg p-0.5 text-xs">
+          <div className="relative flex items-center shrink-0 bg-slate-900 border border-slate-800 rounded-lg p-0.5 text-xs">
             {(['uz', 'ru', 'en'] as Language[]).map((l) => (
               <button
                 key={l}
                 onClick={() => setLang(l)}
-                className={`px-2 py-1 rounded font-semibold uppercase transition ${
+                className={`px-1.5 sm:px-2 py-1 rounded font-semibold uppercase transition ${
                   lang === l
                     ? 'bg-indigo-600 text-white shadow-sm'
                     : 'text-slate-400 hover:text-slate-200'
@@ -1652,12 +1652,12 @@ export default function App() {
           </div>
 
           <button onClick={() => navigateTo('support')}
-            className={`px-3 py-2 rounded-lg text-xs border ${activeTab === 'support' ? 'bg-indigo-600/30 border-indigo-500 text-cyan-300' : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white'}`}
+            className={`hidden sm:inline-flex px-3 py-2 rounded-lg text-xs border ${activeTab === 'support' ? 'bg-indigo-600/30 border-indigo-500 text-cyan-300' : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white'}`}
             title="Qo‘llab-quvvatlash">Yordam</button>
           {/* User Profile / Settings */}
           <button
             onClick={() => navigateTo('profile')}
-            className={`p-2 rounded-lg border transition ${
+            className={`hidden sm:inline-flex p-2 rounded-lg border transition ${
               activeTab === 'profile'
                 ? 'bg-indigo-600/30 border-indigo-500 text-cyan-300'
                 : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white'
@@ -1685,7 +1685,7 @@ export default function App() {
             aria-label={mobileMenuOpen ? 'Menyuni yopish' : 'Menyuni ochish'}
             aria-expanded={mobileMenuOpen}
             aria-controls="careermind-mobile-nav"
-            className="xl:hidden p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-300"
+            className="xl:hidden shrink-0 p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-300"
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
