@@ -3159,7 +3159,7 @@ export default function App() {
           {activeTab === 'assistant' && renderAiAssistant()}
           {activeTab === 'profile' && renderProfile()}
           {activeTab === 'settings' && renderSettings()}
-          {activeTab === 'support' && <SupportPage session={session} onGoProfile={() => setActiveTab('profile')} />}
+          {activeTab === 'support' && <SupportPage lang={lang} session={session} onGoProfile={() => setActiveTab('profile')} />}
         </main>}
         <nav aria-label="Tezkor mobil navigatsiya" className="xl:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-4 gap-1 border-t border-slate-700 bg-slate-950/95 px-2 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur-xl">
           {[
