@@ -1436,6 +1436,8 @@ export default function App() {
   }, [chatMessages, session?.user.id, authReady, localDataOwner]);
 
   const t = TRANSLATIONS[lang];
+  const extraI18n = {"settingsSubtitle":["Tizim parametrlari va ma'lumotlar boshqaruvi.","Управление настройками и данными.","Manage settings and stored data."],"retakeSubtitle":["Yangi ma'lumotlar bilan qayta test topshirish.","Пройти тест повторно с новыми данными.","Retake the assessment with updated information."],"start":["Testni boshlash","Начать тест","Start assessment"],"clearSubtitle":["Barcha saqlangan progress va xabarlarni tozalash.","Очистить сохранённый локальный прогресс и сообщения.","Clear locally saved progress and messages."],"delete":["O'chirish","Очистить","Clear"],"compareWarning":["Maosh, talab, masofaviy ish va o‘sish ko‘rsatkichlari tasdiqlanmagan namuna qiymatlar — real bozor statistikasi emas.","Данные о зарплате, спросе, удалённой работе и росте не подтверждены и не являются рыночной статистикой.","Salary, demand, remote-work and growth data are unverified examples, not actual market statistics."],"loading":["Oxirgi test yuklanmoqda…","Загружается последний тест…","Loading latest assessment…"],"included":[" hisobga olindi (45% ko‘nikma + 25% qiziqish + 30% test)."," учтён (45% навыки + 25% интересы + 30% тест)."," included (45% skills + 25% interests + 30% assessment)."],"noTest":["Test saqlanmagan: 65% ko‘nikma + 35% qiziqish.","Нет сохранённого теста: 65% навыки + 35% интересы.","No saved assessment: 65% skills + 35% interests."],"needsData":["Moslik uchun kamida 3 ta baholangan ko‘nikma va 1 ta qiziqish zarur.","Для расчёта нужны не менее 3 оценённых навыков и 1 интерес.","A match requires at least 3 rated skills and 1 interest."],"fit":["Moslik ko'rsatkichi","Соответствие","Career fit"],"unrated":["Baholanmagan","Не оценено","Not assessed"],"awaiting":["Manba kutilmoqda","Источник не указан","Source pending"],"support":["Yordam","Помощь","Help"]};
+  const tx=(key: keyof typeof extraI18n)=>extraI18n[key][lang==='uz'?0:lang==='ru'?1:2];
 
   // Require substantive profile input before displaying fit estimates.
   const hasCareerAssessment = Object.values(profile.skills).filter(v => v > 0).length >= 3
@@ -1621,7 +1623,7 @@ export default function App() {
 
           <button onClick={() => navigateTo('support')}
             className={`hidden sm:inline-flex px-3 py-2 rounded-lg text-xs border ${activeTab === 'support' ? 'bg-indigo-600/30 border-indigo-500 text-cyan-300' : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white'}`}
-            title="Qo‘llab-quvvatlash">Yordam</button>
+            title={tx('support')}>{tx('support')}</button>
           {/* User Profile / Settings */}
           <button
             onClick={() => navigateTo('profile')}
@@ -2886,11 +2888,11 @@ export default function App() {
         <div>
           <h2 className="text-2xl font-black text-white">{t.compareTitle}</h2>
           <p className="text-xs text-slate-400 mt-1">{t.compareSubtitle}</p>
-          <p className="text-xs text-amber-300 mt-2">Maosh, talab, masofaviy ish va o‘sish ko‘rsatkichlari tasdiqlanmagan namuna qiymatlar — real bozor statistikasi emas.</p>
+          <p className="text-xs text-amber-300 mt-2">{tx('compareWarning')}</p>
         </div>
 
-        <p className="text-xs text-cyan-300">{comparisonLoading ? 'Oxirgi test yuklanmoqda…' : comparisonTest ? 'Assessment '+comparisonTest.version+' hisobga olindi (45% ko‘nikma + 25% qiziqish + 30% test).' : 'Test saqlanmagan: 65% ko‘nikma + 35% qiziqish.'}</p>
-        {!comparisonReady && <p className="text-amber-300 text-sm">Moslik uchun kamida 3 ta baholangan ko‘nikma va 1 ta qiziqish zarur.</p>}
+        <p className="text-xs text-cyan-300">{comparisonLoading ? tx('loading') : comparisonTest ? 'Assessment '+comparisonTest.version+tx('included') : tx('noTest')}</p>
+        {!comparisonReady && <p className="text-amber-300 text-sm">{tx('needsData')}</p>}
         {/* Selection Checkboxes */}
         <div className="bg-slate-900/60 border border-slate-800 p-4 rounded-2xl">
           <label className="block text-xs font-bold text-slate-300 mb-2">{t.selectCareersToCompare}</label>
@@ -2935,12 +2937,12 @@ export default function App() {
             </thead>
             <tbody className="divide-y divide-slate-800/60">
               <tr>
-                <td className="p-4 text-slate-400 font-medium">Moslik ko'rsatkichi</td>
+                <td className="p-4 text-slate-400 font-medium">{tx('fit')}</td>
                 {selectedCareers.map(c => {
                   const score = comparisonRanks.find(item=>item.career.id===c.id)?.score;
                   return (
                     <td key={c.id} className="p-4 font-black text-cyan-400 text-sm">
-                      {comparisonReady && !comparisonLoading && score !== undefined ? score+'%' : 'Baholanmagan'}
+                      {comparisonReady && !comparisonLoading && score !== undefined ? score+'%' : tx('unrated')}
                     </td>
                   );
                 })}
@@ -2949,7 +2951,7 @@ export default function App() {
                 <td className="p-4 text-slate-400 font-medium">{t.salaryRange}</td>
                 {selectedCareers.map(c => (
                   <td key={c.id} className="p-4 font-semibold text-white">
-                    Manba kutilmoqda
+                    {tx('awaiting')}
                   </td>
                 ))}
               </tr>
@@ -2957,7 +2959,7 @@ export default function App() {
                 <td className="p-4 text-slate-400 font-medium">{t.demandLevel}</td>
                 {selectedCareers.map(c => (
                   <td key={c.id} className="p-4 font-semibold text-emerald-400">
-                    Manba kutilmoqda
+                    {tx('awaiting')}
                   </td>
                 ))}
               </tr>
@@ -2965,7 +2967,7 @@ export default function App() {
                 <td className="p-4 text-slate-400 font-medium">{t.remotePotential}</td>
                 {selectedCareers.map(c => (
                   <td key={c.id} className="p-4 font-semibold text-cyan-400">
-                    Manba kutilmoqda
+                    {tx('awaiting')}
                   </td>
                 ))}
               </tr>
@@ -2981,7 +2983,7 @@ export default function App() {
                 <td className="p-4 text-slate-400 font-medium">{t.growthForecast}</td>
                 {selectedCareers.map(c => (
                   <td key={c.id} className="p-4 font-semibold text-slate-200">
-                    Manba kutilmoqda
+                    {tx('awaiting')}
                   </td>
                 ))}
               </tr>
@@ -3064,7 +3066,7 @@ export default function App() {
       <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
         <div>
           <h2 className="text-2xl font-black text-white">{t.settingsTitle}</h2>
-          <p className="text-xs text-slate-400 mt-1">Tizim parametrlari va ma'lumotlar boshqaruvi.</p>
+          <p className="text-xs text-slate-400 mt-1">{tx('settingsSubtitle')}</p>
         </div>
 
         <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 sm:p-8 backdrop-blur-md space-y-6">
@@ -3096,7 +3098,7 @@ export default function App() {
           <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
             <div>
               <div className="text-sm font-bold text-white">{t.resetAssessment}</div>
-              <div className="text-xs text-slate-400">Yangi ma'lumotlar bilan qayta test topshirish.</div>
+              <div className="text-xs text-slate-400">{tx('retakeSubtitle')}</div>
             </div>
             <button
               onClick={() => {
@@ -3105,7 +3107,7 @@ export default function App() {
               }}
               className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-white transition"
             >
-              Testni boshlash
+              {tx('start')}
             </button>
           </div>
 
@@ -3113,7 +3115,7 @@ export default function App() {
           <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
             <div>
               <div className="text-sm font-bold text-rose-400">{t.clearData}</div>
-              <div className="text-xs text-slate-400">Barcha saqlangan progress va xabarlarni tozalash.</div>
+              <div className="text-xs text-slate-400">{tx('clearSubtitle')}</div>
             </div>
             <button
               onClick={() => {
@@ -3124,7 +3126,7 @@ export default function App() {
               }}
               className="px-4 py-2 rounded-xl bg-rose-600/20 border border-rose-500/40 text-rose-300 hover:bg-rose-600/30 text-xs font-semibold transition"
             >
-              O'chirish
+              {tx('delete')}
             </button>
           </div>
         </div>
