@@ -70,14 +70,14 @@ export default function SupportPage({ session, onGoProfile, lang }: { session: S
       {!session ? <div className="space-y-3"><p className="text-amber-300">{tx(13)}</p>
         <button onClick={onGoProfile} className="px-5 py-2 rounded-xl bg-indigo-600 text-white">{tx(14)}</button></div>
       : <form className="space-y-4" onSubmit={e => void submit(e)}>
-          <label className="block text-sm text-slate-300">Mavzu turi
+          <label className="block text-sm text-slate-300">{tx(15)}
             <select value={category} onChange={e=>setCategory(e.target.value)} className="block w-full mt-2 bg-slate-950 border border-slate-700 rounded-xl p-3">
               <option value="technical">{tx(16)}</option><option value="account">{tx(17)}</option>
               <option value="assessment">{tx(18)}</option><option value="suggestion">{tx(19)}</option><option value="other">{tx(20)}</option>
             </select></label>
-          <label className="block text-sm text-slate-300">Sarlavha
+          <label className="block text-sm text-slate-300">{tx(21)}
             <input required minLength={5} maxLength={120} value={subject} onChange={e=>setSubject(e.target.value)} placeholder={tx(22)} className="block w-full mt-2 bg-slate-950 border border-slate-700 rounded-xl p-3 text-white" /></label>
-          <label className="block text-sm text-slate-300">Muammo tafsilotlari
+          <label className="block text-sm text-slate-300">{tx(23)}
             <textarea required minLength={15} maxLength={3000} rows={5} value={description} onChange={e=>setDescription(e.target.value)} placeholder={tx(24)} className="block w-full mt-2 bg-slate-950 border border-slate-700 rounded-xl p-3 text-white" /></label>
           <button disabled={busy} type="submit" className="px-5 py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 rounded-xl font-bold text-white">{busy ? tx(25) : tx(26)}</button>
         </form>}
