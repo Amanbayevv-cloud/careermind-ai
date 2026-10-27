@@ -18,7 +18,6 @@ import {
   BarChart3,
   Laptop,
   CheckCircle2,
-  Circle,
   ArrowRight,
   ArrowLeft,
   Sparkles,
@@ -1465,25 +1464,6 @@ export default function App() {
   }, [inspectedCareerId, selectedCareer]);
 
   // Gamification helpers
-  const handleToggleTask = (taskId: string) => {
-    const isCompleted = !!profile.completedTasks[taskId];
-    const newTasks = { ...profile.completedTasks, [taskId]: !isCompleted };
-    const xpChange = !isCompleted ? 50 : -50;
-    const newXp = Math.max(0, profile.xp + xpChange);
-
-    let updatedBadges = [...profile.unlockedBadges];
-    if (Object.values(newTasks).filter(Boolean).length >= 5 && !updatedBadges.includes('task_master')) {
-      updatedBadges.push('task_master');
-    }
-
-    setProfile(prev => ({
-      ...prev,
-      completedTasks: newTasks,
-      xp: newXp,
-      unlockedBadges: updatedBadges
-    }));
-  };
-
   const handleSendMessage = async (textToSend?: string) => {
     if (isAiTyping) return;
     const query = textToSend || chatInput;
