@@ -2,11 +2,11 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { requireSupabase } from '../services/supabaseClient';
 import { DOMAIN_LABELS, DOMAINS_V3, type Domain3 } from '../assessment/assessmentV3';
+import { rankCareers, hasMatchingData, type MatchProfile, type MatchCareer, type MatchTest } from '../services/careerMatching';
 
 type Attempt = {id:string;created_at:string;version:string;results:{scores?:Partial<Record<Domain3,{percent:number}>>;recommendations?:{career:string;score:number}[]}};
 type Roadmap = {career_id:string;duration_months:number;plan_data:unknown;completed_tasks:unknown;updated_at:string};
-type ProfileRecommendation = { title:string; score:number };
-export default function DashboardV2({session,onGo,recommendations,profileAssessed,selectedCareer}:{session:Session|null;onGo:(page:string)=>void;recommendations:ProfileRecommendation[];profileAssessed:boolean;selectedCareer:string|null}) {
+export default function DashboardV2({session,onGo,profile,careers,selectedCareer}:{session:Session|null;onGo:(page:string)=>void;profile:MatchProfile;careers:MatchCareer[];selectedCareer:string|null}) {
  const [attempts,setAttempts]=useState<Attempt[]>([]);
  const [roadmaps,setRoadmaps]=useState<Roadmap[]>([]);
  const [loading,setLoading]=useState(false);
@@ -29,6 +29,8 @@ export default function DashboardV2({session,onGo,recommendations,profileAssesse
  },[session?.user.id]);
  useEffect(()=>{void reload();},[reload]);
  const latest=attempts.find(a=>a.version==='3.0'||a.version==='3.1-adaptive');
+ const matchingReady=hasMatchingData(profile);
+ const ranked=rankCareers(careers,profile,latest as MatchTest|null);
  const latestPlan=roadmaps.find(p=>p.career_id===selectedCareer) ?? roadmaps[0];
  const tasks=Array.isArray(latestPlan?.plan_data)?latestPlan.plan_data:[];
  const completed=(latestPlan?.completed_tasks && typeof latestPlan.completed_tasks==='object' && !Array.isArray(latestPlan.completed_tasks))?latestPlan.completed_tasks as Record<string,boolean>:{};
@@ -53,10 +55,10 @@ export default function DashboardV2({session,onGo,recommendations,profileAssesse
        <button onClick={()=>onGo('assessmentV3')} className="text-cyan-300 underline text-sm">Testga o‘tish</button>
      </div>
      <div className="bg-slate-900 border border-slate-700 rounded-xl p-5 space-y-4"><h2 className="text-xl font-bold">Tavsiya etilgan kasblar</h2>
-       {profileAssessed && recommendations.length ? <>
-         <p className="text-xs text-slate-400">Profil ma’lumotlari asosida hisoblangan taxminiy tavsiyalar (eski Dashboard bilan bir xil)</p>
-         {recommendations.slice(0,3).map((c,i)=><div key={i} className="flex justify-between gap-3 text-sm border-b border-slate-800 pb-2"><span>{c.title}</span><strong>{c.score}%</strong></div>)}
-       </> : <p className="text-sm text-slate-400">Profil bo‘yicha moslik hali baholanmagan. Ko‘nikmalar va qiziqishlarni kiriting.</p>}
+       {matchingReady && ranked.length ? <>
+         <p className="text-xs text-slate-400">Career Matching 3.1 bilan bir xil hisoblangan tavsiyalar; oxirgi test natijasi ham hisobga olinadi</p>
+         {ranked.slice(0,3).map((c,i)=><div key={i} className="flex justify-between gap-3 text-sm border-b border-slate-800 pb-2"><span>{c.career.title}</span><strong>{c.score}%</strong></div>)}
+       </> : <p className="text-sm text-slate-400">Moslik uchun kamida 3 ko‘nikma va 1 qiziqishni kiriting.</p>}
        {latest?.results.recommendations?.length ? <details className="text-xs text-slate-400"><summary className="cursor-pointer">Assessment {latest.version} testining alohida tavsiyalari</summary><div className="space-y-2 pt-2">{latest.results.recommendations.slice(0,3).map((c,i)=><p key={i}>{c.career}: {c.score}%</p>)}</div><p className="pt-1">Bu boshqa baholash metodikasi, profil mosligi bilan bevosita solishtirilmaydi.</p></details> : null}
        <button onClick={()=>onGo('careerMatchingV3')} className="text-cyan-300 underline text-sm">Career Matching 3.0 ni ochish</button>
      </div>
