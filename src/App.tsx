@@ -2445,8 +2445,8 @@ export default function App() {
                 {t.welcome}, {profile.name || 'Foydalanuvchi'} 👋
               </h2>
               <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-xl">
-                Sizning eng yuqori moslikdagi yo'nalishingiz: <span className="font-bold text-cyan-300">{bestMatch.career.titleKey}</span>. 
-                O'quv rejasida qolgan vazifalarni bajarishda davom eting!
+                {hasCareerAssessment ? <>Taxminiy eng mos kasb: <span className="font-bold text-cyan-300">{bestMatch.career.titleKey}</span>.</> : <>Kasb mosligi baholanmagan. Avval testni to‘ldiring.</>}
+                <span className="block mt-1">Tanlangan o‘quv yo‘nalishi: <strong className="text-cyan-300">{profile.selectedCareerId ? activeCareer.titleKey : 'Hali tanlanmagan'}</strong>.</span>
               </p>
             </div>
 
@@ -2513,11 +2513,11 @@ export default function App() {
                     <div className="mt-4 pt-3 border-t border-slate-800/60 space-y-1.5 text-xs">
                       <div className="flex justify-between text-slate-300">
                         <span className="text-slate-500">Maosh:</span>
-                        <span className="font-semibold">{item.career.baseSalary}</span>
+                        <span className="font-semibold">Manba kutilmoqda</span>
                       </div>
                       <div className="flex justify-between text-slate-300">
                         <span className="text-slate-500">Talab:</span>
-                        <span className="font-semibold text-emerald-400">{item.career.demand}</span>
+                        <span className="font-semibold text-emerald-400">Manba kutilmoqda</span>
                       </div>
                     </div>
                   </div>
@@ -2557,9 +2557,9 @@ export default function App() {
               <div>
                 <h4 className="text-base font-bold text-white flex items-center space-x-2">
                   <BookOpen className="w-4 h-4 text-cyan-400" />
-                  <span>Aktiv Yo'l Xaritasi: {activeCareer.titleKey}</span>
+                  <span>{profile.selectedCareerId ? 'Tanlangan yo‘l xaritasi: ' : 'Namunaviy yo‘l xaritasi: '}{activeCareer.titleKey}</span>
                 </h4>
-                <p className="text-xs text-slate-400 mt-0.5">Vazifalarni bajarib, tajribangizni oshiring.</p>
+                <p className="text-xs text-slate-400 mt-0.5">Tanlangan o‘quv yo‘nalishi avtomatik kasb tavsiyasidan farq qilishi mumkin.</p>
               </div>
               <div className="text-right">
                 <span className="text-xs font-bold text-cyan-400">{progressPercent}%</span>
