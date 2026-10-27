@@ -1,27 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { requireSupabase } from '../services/supabaseClient';
-import type { Domain3 } from '../assessment/assessmentV3';
+import { hasMatchingData, rankCareers, type MatchCareer, type MatchProfile, type MatchTest } from '../services/careerMatching';
 
-export interface MatchCareer {id:string;title:string;category:string;requiredSkills:Record<string,number>;associatedInterests:string[];description:string}
-export interface MatchProfile {interests:string[];skills:Record<string,number>}
-type Test = {version:string;results:{scores?:Partial<Record<Domain3,{percent:number}>>}};
-const links:Record<Domain3,string>={logic:'problemSolving',numeracy:'mathematics',programming:'programming',analysis:'dataAnalysis',digital:'programming'};
-const metricKeys:Domain3[]=['logic','numeracy','programming','analysis','digital'];
-function rate(career:MatchCareer,profile:MatchProfile,test:Test|null) {
- const requirements=Object.entries(career.requiredSkills);
- const skillMatch=requirements.length?requirements.reduce((total,[k,target])=>total+Math.max(0,100-Math.abs((profile.skills[k]??5)-target)*10),0)/requirements.length:50;
- const interestHits=career.associatedInterests.filter(i=>profile.interests.some(p=>p.toLowerCase()===i.toLowerCase()));
- const interestMatch=career.associatedInterests.length?Math.round(interestHits.length/career.associatedInterests.length*100):50;
- const relevant=metricKeys.filter(d=>career.requiredSkills[links[d]]!==undefined&&test?.results?.scores?.[d]?.percent!==undefined);
- const testMatch=relevant.length?relevant.reduce((sum,d)=>sum+(test?.results.scores?.[d]?.percent??0),0)/relevant.length:null;
- const score=Math.round(testMatch===null?skillMatch*.65+interestMatch*.35:skillMatch*.45+interestMatch*.25+testMatch*.30);
- const strengths=requirements.filter(([k,need])=>(profile.skills[k]??0)>=need).map(([k])=>k).slice(0,3);
- const gaps=requirements.filter(([k,need])=>(profile.skills[k]??0)<need).sort((a,b)=>(b[1]-(profile.skills[b[0]]??0))-(a[1]-(profile.skills[a[0]]??0))).map(([k])=>k).slice(0,3);
- return {career,score,interestHits,strengths,gaps,testMatch};
-}
 export default function CareerMatchingV3({session,profile,careers,onChoose}:{session:Session|null;profile:MatchProfile;careers:MatchCareer[];onChoose:(id:string)=>void}) {
- const [test,setTest]=useState<Test|null>(null);
+ const [test,setTest]=useState<MatchTest|null>(null);
  const [notice,setNotice]=useState('');
  const [loading,setLoading]=useState(false);
  useEffect(()=>{
@@ -32,15 +15,15 @@ export default function CareerMatchingV3({session,profile,careers,onChoose}:{ses
    const {data,error}=await requireSupabase().from('assessment_attempts').select('version,results').eq('user_id',session.user.id).in('version',['3.0','3.1-adaptive']).order('created_at',{ascending:false}).limit(1);
    if(!alive)return;
    if(error){setTest(null);setNotice('Test ma’lumotini olishda xatolik: '+error.message);}
-   else setTest((data?.[0] as Test)||null);
+   else setTest((data?.[0] as MatchTest)||null);
    setLoading(false);
   })().catch(e=>{if(alive){setNotice(String(e));setLoading(false);}});
   return ()=>{alive=false;};
  },[session?.user.id]);
- const hasEnoughData = Object.values(profile.skills).filter(value => value > 0).length >= 3 && profile.interests.length > 0;
- const ranked=useMemo(()=>careers.map(c=>rate(c,profile,test)).sort((a,b)=>b.score-a.score).slice(0,5),[careers,profile,test]);
+ const hasEnoughData = hasMatchingData(profile);
+ const ranked=useMemo(()=>rankCareers(careers,profile,test).slice(0,5),[careers,profile,test]);
  return <main className="max-w-5xl mx-auto px-4 py-8 space-y-6">
-  <header><h1 className="text-2xl font-black text-white">Career Matching 3.0</h1>
+  <header><h1 className="text-2xl font-black text-white">Career Matching 3.1</h1>
    <p className="text-slate-400 text-sm mt-2">Qiziqishlar, o‘zingiz baholagan ko‘nikmalar va oxirgi test birgalikda hisobga olinadi. Moslik foizi taxminiy ko‘rsatkich, ishga joylashish ehtimoli emas.</p>
    <p className="text-cyan-300 text-xs mt-2">{loading?'Test ma’lumotlari yuklanmoqda…':test?`Assessment ${test.version} qo‘shildi`:'Test ma’lumotisiz profil bo‘yicha hisoblandi'}</p>
    {notice&&<p className="text-amber-300 text-xs mt-2">{notice}</p>}
