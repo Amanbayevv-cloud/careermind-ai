@@ -1775,10 +1775,10 @@ export default function App() {
         {/* Trust Badges & Numbers */}
         <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto text-left">
           {[
-            { val: "94.8%", label: "Accuracy Rating", sub: "Algorithm satisfaction" },
-            { val: "8+", label: "In-Depth Fields", sub: "Tech & Product tracks" },
-            { val: "6-Month", label: "Structured Roadmaps", sub: "Milestone-driven" },
-            { val: "100%", label: "Explainable Match", sub: "Multi-factor formula" }
+            { val: "30", label: "Test savollari", sub: "Assessment 3.0" },
+            { val: "5", label: "Ko‘nikma yo‘nalishi", sub: "Boshlang‘ich baholash" },
+            { val: "3–6 oy", label: "Shaxsiy o‘quv rejasi", sub: "Haftalik topshiriqlar" },
+            { val: "Top 5", label: "Kasb tavsiyalari", sub: "Izohli taxminiy moslik" }
           ].map((stat, i) => (
             <div key={i} className="p-4 rounded-xl bg-slate-900/40 border border-slate-800/80 backdrop-blur-sm">
               <div className="text-2xl font-black text-white">{stat.val}</div>
@@ -3463,7 +3463,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-slate-950 text-slate-100 font-sans selection:bg-cyan-500 selection:text-slate-950 flex flex-col justify-between pb-20 xl:pb-0">
+    <div className="min-h-screen overflow-x-hidden bg-slate-950 text-slate-100 font-sans selection:bg-cyan-500 selection:text-slate-950 flex flex-col justify-between pb-28 xl:pb-0">
       <div>
         {renderNavbar()}
 
