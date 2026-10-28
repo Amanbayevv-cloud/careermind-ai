@@ -1,32 +1,59 @@
 // Deploy as a Supabase Edge Function. Configure OPENAI_API_KEY as a secret.
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
-const cors = {
-  'Access-Control-Allow-Origin': Deno.env.get('ALLOWED_ORIGIN') || 'http://localhost:5173',
+// Comma-separated exact browser origins, for example:
+// ALLOWED_ORIGINS=https://your-preview.vercel.app,https://your-domain.example
+// Keep local development origin separate from hosted origins.
+const allowedOrigins = new Set(
+  (Deno.env.get('ALLOWED_ORIGINS') || Deno.env.get('ALLOWED_ORIGIN') || 'http://localhost:5173')
+    .split(',').map((origin) => origin.trim()).filter(Boolean)
+);
+const corsFor = (origin: string | null): Record<string, string> => ({
   'Access-Control-Allow-Headers': 'authorization, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Vary': 'Origin',
-};
-const reply = (data: unknown, status = 200) =>
-  new Response(JSON.stringify(data), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
+  ...(origin && allowedOrigins.has(origin) ? { 'Access-Control-Allow-Origin': origin } : {}),
+});
+const reply = (data: unknown, status: number, origin: string | null) =>
+  new Response(JSON.stringify(data), {
+    status,
+    headers: { ...corsFor(origin), 'Content-Type': 'application/json' },
+  });
 
 Deno.serve(async (request) => {
-  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
-  if (request.method !== 'POST') return reply({ error: 'Method not allowed' }, 405);
+  const origin = request.headers.get('Origin');
+  if (origin && !allowedOrigins.has(origin)) {
+    return reply({ error: 'Origin not allowed' }, 403, origin);
+  }
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsFor(origin) });
+  }
+  if (request.method !== 'POST') return reply({ error: 'Method not allowed' }, 405, origin);
+  // Reject oversized requests before loading them into memory.
+  const maxBytes = 8192;
+  if (Number(request.headers.get('content-length') || 0) > maxBytes) {
+    return reply({ error: 'Request too large' }, 413, origin);
+  }
   const authHeader = request.headers.get('authorization');
-  if (!authHeader?.startsWith('Bearer ')) return reply({ error: 'Sign in required' }, 401);
+  if (!authHeader?.startsWith('Bearer ')) return reply({ error: 'Sign in required' }, 401, origin);
   const url = Deno.env.get('SUPABASE_URL');
   const anon = Deno.env.get('SUPABASE_ANON_KEY');
   const secret = Deno.env.get('OPENAI_API_KEY');
-  if (!url || !anon || !secret) return reply({ error: 'Server is not configured' }, 503);
+  if (!url || !anon || !secret) return reply({ error: 'Server is not configured' }, 503, origin);
   const supabase = createClient(url, anon, { global: { headers: { Authorization: authHeader } }, auth: { persistSession: false } });
   const { data: { user }, error } = await supabase.auth.getUser(authHeader.slice(7));
-  if (error || !user) return reply({ error: 'Invalid session' }, 401);
+  if (error || !user) return reply({ error: 'Invalid session' }, 401, origin);
   let payload: unknown;
-  try { payload = await request.json(); } catch { return reply({ error: 'Invalid JSON' }, 400); }
+  try {
+    const raw = await request.text();
+    if (new TextEncoder().encode(raw).byteLength > maxBytes) {
+      return reply({ error: 'Request too large' }, 413, origin);
+    }
+    payload = JSON.parse(raw);
+  } catch { return reply({ error: 'Invalid JSON' }, 400, origin); }
   const body = payload as { message?: unknown; context?: unknown };
   const message = typeof body?.message === 'string' ? body.message.trim() : '';
-  if (!message || message.length > 2000) return reply({ error: 'Message must be 1–2000 characters' }, 400);
+  if (!message || message.length > 2000) return reply({ error: 'Message must be 1–2000 characters' }, 400, origin);
   const context = typeof body?.context === 'string' ? body.context.slice(0, 1200) : '';
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -43,10 +70,10 @@ Deno.serve(async (request) => {
       }),
       signal: AbortSignal.timeout(20000)
     });
-    if (!response.ok) return reply({ error: 'AI service temporarily unavailable' }, 502);
+    if (!response.ok) return reply({ error: 'AI service temporarily unavailable' }, 502, origin);
     const result = await response.json();
     const answer = result?.choices?.[0]?.message?.content;
-    if (typeof answer !== 'string' || !answer.trim()) return reply({ error: 'Empty AI response' }, 502);
-    return reply({ reply: answer });
-  } catch { return reply({ error: 'AI request failed' }, 502); }
+    if (typeof answer !== 'string' || !answer.trim()) return reply({ error: 'Empty AI response' }, 502, origin);
+    return reply({ reply: answer }, 200, origin);
+  } catch { return reply({ error: 'AI request failed' }, 502, origin); }
 });
