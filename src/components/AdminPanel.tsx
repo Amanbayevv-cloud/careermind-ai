@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { requireSupabase } from '../services/supabaseClient';
 
-type Ticket = { id: string; user_id: string; subject: string; category: string; status: string; created_at: string };
+type Ticket = { id: string; user_id: string; subject: string; category: string; status: string; description: string; created_at: string };
+type AdminNote = { id: string; ticket_id: string; note: string; created_at: string };
+type Audit = { id: number; ticket_id: string; old_status: string; new_status: string; changed_at: string };
 type Profile = { user_id: string; display_name: string; updated_at: string };
 
 export default function AdminPanel({ session }: { session: Session | null }) {
@@ -11,19 +13,29 @@ export default function AdminPanel({ session }: { session: Session | null }) {
   const [error, setError] = useState('');
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [filter, setFilter] = useState('all');
+  const [query, setQuery] = useState('');
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [noteText, setNoteText] = useState('');
+  const [notes, setNotes] = useState<AdminNote[]>([]);
+  const [audit, setAudit] = useState<Audit[]>([]);
   const [saving, setSaving] = useState<string | null>(null);
 
   async function refresh(userId: string) {
     const db = requireSupabase();
-    const [people, issues] = await Promise.all([
+    const [people, issues, noteRows, auditRows] = await Promise.all([
       db.from('profiles').select('user_id,display_name,updated_at').order('updated_at', { ascending: false }).limit(100),
-      db.from('support_tickets').select('id,user_id,subject,category,status,created_at').order('created_at', { ascending: false }).limit(100),
+      db.from('support_tickets').select('id,user_id,subject,category,status,description,created_at').order('created_at', { ascending: false }).limit(100),
+      db.from('support_admin_notes').select('id,ticket_id,note,created_at').order('created_at', { ascending: false }).limit(100),
+      db.from('support_status_audit').select('id,ticket_id,old_status,new_status,changed_at').order('changed_at', { ascending: false }).limit(100),
     ]);
-    if (people.error || issues.error) throw people.error || issues.error;
+    if (people.error || issues.error || noteRows.error || auditRows.error) throw people.error || issues.error || noteRows.error || auditRows.error;
     // The server enforces admin access through RLS; this only guards stale UI responses.
     if ((await db.auth.getUser()).data.user?.id !== userId) return;
     setProfiles((people.data || []) as Profile[]);
     setTickets((issues.data || []) as Ticket[]);
+    setNotes((noteRows.data || []) as AdminNote[]);
+    setAudit((auditRows.data || []) as Audit[]);
   }
 
   useEffect(() => {
@@ -59,8 +71,20 @@ export default function AdminPanel({ session }: { session: Session | null }) {
     finally { setSaving(null); }
   }
 
+  async function addNote(ticketId: string) {
+    if (!session || !authorized || !noteText.trim() || saving) return;
+    setSaving(ticketId); setError('');
+    try {
+      const { error: saveError } = await requireSupabase().from('support_admin_notes').insert({ticket_id: ticketId, admin_user_id: session.user.id, note: noteText.trim().slice(0,2000)});
+      if (saveError) throw saveError;
+      setNoteText(''); await refresh(session.user.id);
+    } catch (e) { setError(e instanceof Error ? e.message : 'Izoh saqlanmadi'); }
+    finally { setSaving(null); }
+  }
+  const filtered = tickets.filter(t => (filter === 'all' || t.status === filter) && [t.subject,t.category,t.description].some(v => v.toLowerCase().includes(query.toLowerCase())));
+  const statusCounts = {open:tickets.filter(t=>t.status==='open').length,in_progress:tickets.filter(t=>t.status==='in_progress').length,resolved:tickets.filter(t=>t.status==='resolved').length};
   return <section className="max-w-6xl mx-auto px-4 py-8 space-y-6 text-white">
-    <h1 className="text-3xl font-black">Admin Panel 1.0</h1>
+    <h1 className="text-3xl font-black">Admin Panel 2.0</h1>
     {loading && <p role="status" className="text-slate-300">Tekshirilmoqda…</p>}
     {!loading && !session && <p className="text-amber-300">Administrator sifatida tizimga kiring.</p>}
     {!loading && session && !authorized && <p className="text-amber-300">Administrator ruxsati mavjud emas.</p>}
@@ -71,14 +95,17 @@ export default function AdminPanel({ session }: { session: Session | null }) {
         <div className="rounded-xl border border-slate-700 bg-slate-900 p-5"><p className="text-slate-400">Ko‘rsatilgan profillar</p><p className="text-3xl font-bold">{profiles.length}{profiles.length===100?'+':''}</p></div>
         <div className="rounded-xl border border-slate-700 bg-slate-900 p-5"><p className="text-slate-400">Ko‘rsatilgan murojaatlar</p><p className="text-3xl font-bold">{tickets.length}{tickets.length===100?'+':''}</p></div>
       </div>
+      <div className="grid sm:grid-cols-3 gap-3">{([['Ochiq',statusCounts.open],['Jarayonda',statusCounts.in_progress],['Yechilgan',statusCounts.resolved]] as const).map(([label,n])=><div key={label} className="rounded-xl bg-slate-900 border border-slate-700 p-4"><p className="text-slate-400 text-sm">{label}</p><p className="text-2xl font-bold">{n}</p></div>)}</div>
       <div className="rounded-xl border border-slate-700 bg-slate-900 p-5 space-y-3">
         <h2 className="text-xl font-bold">Murojaatlarni boshqarish</h2>
+        <div className="flex flex-wrap gap-3"><input aria-label="Murojaatlarni qidirish" className="flex-1 min-w-40 rounded-lg bg-slate-950 border border-slate-700 p-2" placeholder="Murojaat qidirish..." value={query} onChange={e=>setQuery(e.target.value)}/><select aria-label="Holat filtri" className="rounded-lg bg-slate-950 border border-slate-700 p-2" value={filter} onChange={e=>setFilter(e.target.value)}><option value="all">Barchasi</option><option value="open">Ochiq</option><option value="in_progress">Jarayonda</option><option value="resolved">Yechilgan</option></select></div>
         {tickets.length === 0 && <p className="text-slate-400">Murojaatlar mavjud emas.</p>}
-        {tickets.map(t => <div key={t.id} className="flex flex-wrap gap-3 items-center justify-between border-b border-slate-800 py-3">
-          <div><p className="font-semibold">{t.subject}</p><p className="text-xs text-slate-400">{t.category} · {new Date(t.created_at).toLocaleDateString()}</p></div>
+        {filtered.map(t => <div key={t.id} className="flex flex-wrap gap-3 items-center justify-between border-b border-slate-800 py-3">
+          <div className="min-w-0"><button className="font-semibold text-left hover:underline" onClick={()=>{setExpanded(expanded===t.id?null:t.id);setNoteText('')}}>{t.subject} {expanded===t.id?'▴':'▾'}</button><p className="text-xs text-slate-400">{t.category} · {new Date(t.created_at).toLocaleDateString()}</p></div>
           <label className="text-sm">Holati <select className="ml-2 rounded-lg bg-slate-950 border border-slate-700 px-3 py-2" value={t.status} disabled={saving===t.id} onChange={e => void changeStatus(t.id,e.target.value)}>
             <option value="open">Ochiq</option><option value="in_progress">Jarayonda</option><option value="resolved">Yechilgan</option>
           </select></label>
+          {expanded===t.id && <div className="w-full space-y-3 rounded-lg border border-slate-700 bg-slate-950/60 p-4"><p className="whitespace-pre-wrap break-words text-sm">{t.description}</p><h3 className="font-semibold text-sm">Ichki administrator izohlari</h3>{notes.filter(n=>n.ticket_id===t.id).map(n=><p key={n.id} className="text-xs text-slate-300 whitespace-pre-wrap break-words">{n.note} · {new Date(n.created_at).toLocaleString()}</p>)}<textarea aria-label="Yangi ichki izoh" className="w-full rounded-lg bg-slate-950 border border-slate-700 p-2" maxLength={2000} value={noteText} onChange={e=>setNoteText(e.target.value)} placeholder="Ichki izoh (foydalanuvchiga ko‘rinmaydi)" /><button disabled={!noteText.trim() || !!saving} className="rounded-lg bg-indigo-600 px-4 py-2 disabled:opacity-50" onClick={()=>void addNote(t.id)}>Izohni saqlash</button><h3 className="font-semibold text-sm">Status tarixi</h3>{audit.filter(a=>a.ticket_id===t.id).map(a=><p key={a.id} className="text-xs text-slate-400">{a.old_status} → {a.new_status} · {new Date(a.changed_at).toLocaleString()}</p>)}</div>}
         </div>)}
       </div>
       <div className="rounded-xl border border-slate-700 bg-slate-900 p-5 space-y-3">
