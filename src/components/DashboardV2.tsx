@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { requireSupabase } from '../services/supabaseClient';
 import { DOMAIN_LABELS, DOMAINS_V3, type Domain3 } from '../assessment/assessmentV3';
@@ -14,8 +14,14 @@ export default function DashboardV2({session,onGo,profile,careers,selectedCareer
  const [roadmaps,setRoadmaps]=useState<Roadmap[]>([]);
  const [loading,setLoading]=useState(false);
  const [message,setMessage]=useState('');
+ const requestGeneration=useRef(0);
+ const lastOwner=useRef<string|null>(null);
+ const currentOwner=session?.user.id??null;
+ if(lastOwner.current!==currentOwner){lastOwner.current=currentOwner;requestGeneration.current+=1;}
  const reload=useCallback(async()=>{
-  if(!session){setAttempts([]);setRoadmaps([]);return;}
+  const generation=++requestGeneration.current;
+  if(!session){setAttempts([]);setRoadmaps([]);setLoading(false);setMessage('');return;}
+  setAttempts([]);setRoadmaps([]);
   setLoading(true);setMessage('');
   try{
    const client=requireSupabase();
@@ -25,12 +31,13 @@ export default function DashboardV2({session,onGo,profile,careers,selectedCareer
    ]);
    if(tests.error)throw tests.error;
    if(plans.error)throw plans.error;
+   if(generation!==requestGeneration.current)return;
    setAttempts((tests.data||[]) as Attempt[]);
    setRoadmaps((plans.data||[]) as Roadmap[]);
-  }catch(e){setMessage(e instanceof Error?e.message:'Ma’lumotlarni yuklashda xatolik');}
-  finally{setLoading(false);}
+  }catch(e){if(generation===requestGeneration.current)setMessage(e instanceof Error?e.message:'Ma’lumotlarni yuklashda xatolik');}
+  finally{if(generation===requestGeneration.current)setLoading(false);}
  },[session?.user.id]);
- useEffect(()=>{void reload();},[reload]);
+ useEffect(()=>{void reload();return ()=>{requestGeneration.current+=1};},[reload]);
  const latest=attempts.find(a=>a.version==='3.0'||a.version==='3.1-adaptive');
  const matchingReady=hasMatchingData(profile);
  const ranked=rankCareers(careers,profile,latest as MatchTest|null);
