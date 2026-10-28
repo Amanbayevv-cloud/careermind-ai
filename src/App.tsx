@@ -3150,18 +3150,18 @@ export default function App() {
           {activeTab === 'assessment' && <><div className="max-w-4xl mx-auto px-4 pt-6"><button onClick={() => setActiveTab('assessmentV3')} className="bg-cyan-700 hover:bg-cyan-600 text-white rounded-xl px-5 py-3 font-bold">{lx('newTest')}</button></div>{renderAssessment()}</>}
           {activeTab === 'assessmentV3' && <><div className="max-w-4xl mx-auto px-4 pt-6"><button onClick={() => setActiveTab('adaptiveAssessment')} className="bg-purple-700 hover:bg-purple-600 text-white rounded-xl px-5 py-3 font-bold">{lx('adaptiveTest')}</button></div><AssessmentV3 session={session} /></>}
           {activeTab === 'adaptiveAssessment' && <AdaptiveAssessment session={session} />}
-          {(activeTab === 'dashboard' || activeTab === 'dashboardV2') && <DashboardV2 lang={lang} session={session} onGo={setActiveTab} profile={{interests:profile.interests,skills:{...profile.skills}}} careers={CAREER_DATABASE.map(c=>({id:c.id,title:c.titleKey,category:c.category,description:c.descriptionKey,requiredSkills:c.requiredSkills as Record<string,number>,associatedInterests:c.associatedInterests}))} selectedCareer={profile.selectedCareerId ? selectedCareer.titleKey : null} />}
+          {(activeTab === 'dashboard' || activeTab === 'dashboardV2') && <DashboardV2 key={session?.user.id ?? 'guest'} lang={lang} session={session} onGo={setActiveTab} profile={{interests:profile.interests,skills:{...profile.skills}}} careers={CAREER_DATABASE.map(c=>({id:c.id,title:c.titleKey,category:c.category,description:c.descriptionKey,requiredSkills:c.requiredSkills as Record<string,number>,associatedInterests:c.associatedInterests}))} selectedCareer={profile.selectedCareerId ? selectedCareer.titleKey : null} />}
           {activeTab === 'careers' && <><div className="max-w-5xl mx-auto px-4 pt-6"><button onClick={() => setActiveTab('careerMatchingV3')} className="bg-cyan-700 hover:bg-cyan-600 text-white rounded-xl px-5 py-3 font-bold">{lx('catalogButton')}</button></div>{renderCareerDirectory()}</>}
-          {activeTab === 'careerMatchingV3' && <CareerMatchingV3 lang={lang} session={session} profile={{interests:profile.interests,skills:{...profile.skills}}} careers={CAREER_DATABASE.map(c=>({id:c.id,title:c.titleKey,category:c.category,description:c.descriptionKey,requiredSkills:c.requiredSkills as Record<string,number>,associatedInterests:c.associatedInterests}))} onChoose={(id)=>{setProfile(p=>({...p,selectedCareerId:id}));setActiveTab('smartRoadmap');}} />}
+          {activeTab === 'careerMatchingV3' && <CareerMatchingV3 key={session?.user.id ?? 'guest'} lang={lang} session={session} profile={{interests:profile.interests,skills:{...profile.skills}}} careers={CAREER_DATABASE.map(c=>({id:c.id,title:c.titleKey,category:c.category,description:c.descriptionKey,requiredSkills:c.requiredSkills as Record<string,number>,associatedInterests:c.associatedInterests}))} onChoose={(id)=>{setProfile(p=>({...p,selectedCareerId:id}));setActiveTab('smartRoadmap');}} />}
           {activeTab === 'myCareer' && renderCareerDetails()}
           {activeTab === 'skillGap' && renderSkillGap()}
-          {activeTab === 'roadmap' && <SmartRoadmap lang={lang} session={session} career={selectedCareer.titleKey} />}
-          {activeTab === 'smartRoadmap' && <SmartRoadmap lang={lang} session={session} career={selectedCareer.titleKey} />}
+          {activeTab === 'roadmap' && <SmartRoadmap key={session?.user.id ?? 'guest'} lang={lang} session={session} career={selectedCareer.titleKey} />}
+          {activeTab === 'smartRoadmap' && <SmartRoadmap key={session?.user.id ?? 'guest'} lang={lang} session={session} career={selectedCareer.titleKey} />}
           {activeTab === 'compare' && renderCareerComparison()}
           {activeTab === 'assistant' && renderAiAssistant()}
           {activeTab === 'profile' && renderProfile()}
           {activeTab === 'settings' && renderSettings()}
-          {activeTab === 'support' && <SupportPage lang={lang} session={session} onGoProfile={() => setActiveTab('profile')} />}
+          {activeTab === 'support' && <SupportPage key={session?.user.id ?? 'guest'} lang={lang} session={session} onGoProfile={() => setActiveTab('profile')} />}
         </main>}
         <nav aria-label="Tezkor mobil navigatsiya" className="xl:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-4 gap-1 border-t border-slate-700 bg-slate-950/95 px-2 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur-xl">
           {[
