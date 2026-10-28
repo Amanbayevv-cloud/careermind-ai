@@ -1983,7 +1983,7 @@ export default function App() {
   const renderAssessment = () => {
     const handleNext = () => {
       if (assessmentStep === 1 && !profileIsValid) {
-        setAssessmentValidationNotice('lx('validation')');
+        setAssessmentValidationNotice(lx('validation'));
         return;
       }
       setAssessmentValidationNotice('');
