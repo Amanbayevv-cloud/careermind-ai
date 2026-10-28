@@ -38,11 +38,13 @@ Deno.serve(async (request) => {
   if (!authHeader?.startsWith('Bearer ')) return reply({ error: 'Sign in required' }, 401, origin);
   const url = Deno.env.get('SUPABASE_URL');
   const anon = Deno.env.get('SUPABASE_ANON_KEY');
-  const secret = Deno.env.get('OPENAI_API_KEY');
-  if (!url || !anon || !secret) return reply({ error: 'Server is not configured' }, 503, origin);
+  if (!url || !anon) return reply({ error: 'Supabase auth is not configured' }, 503, origin);
   const supabase = createClient(url, anon, { global: { headers: { Authorization: authHeader } }, auth: { persistSession: false } });
   const { data: { user }, error } = await supabase.auth.getUser(authHeader.slice(7));
   if (error || !user) return reply({ error: 'Invalid session' }, 401, origin);
+  // Provider credentials are only required after authentication succeeds.
+  const secret = Deno.env.get('OPENAI_API_KEY');
+  if (!secret) return reply({ error: 'AI service is not configured' }, 503, origin);
   let payload: unknown;
   try {
     const raw = await request.text();
