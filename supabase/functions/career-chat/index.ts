@@ -42,6 +42,20 @@ Deno.serve(async (request) => {
   const supabase = createClient(url, anon, { global: { headers: { Authorization: authHeader } }, auth: { persistSession: false } });
   const { data: { user }, error } = await supabase.auth.getUser(authHeader.slice(7));
   if (error || !user) return reply({ error: 'Invalid session' }, 401, origin);
+  // Atomic, database-backed limit shared by all Edge Function instances.
+  // This runs after user verification, and fails closed if the database is unavailable.
+  const { data: quota, error: quotaError } = await supabase
+    .rpc('consume_career_chat_quota');
+  const quotaResult = Array.isArray(quota) ? quota[0] : null;
+  if (quotaError || !quotaResult || typeof quotaResult.allowed !== 'boolean') {
+    return reply({ error: 'Request limit check unavailable' }, 503, origin);
+  }
+  if (!quotaResult.allowed) {
+    return new Response(JSON.stringify({ error: 'Too many requests', retry_after_seconds: quotaResult.retry_after_seconds }), {
+      status: 429,
+      headers: { ...corsFor(origin), 'Content-Type': 'application/json', 'Retry-After': String(quotaResult.retry_after_seconds) },
+    });
+  }
   // Provider credentials are only required after authentication succeeds.
   const secret = Deno.env.get('OPENAI_API_KEY');
   if (!secret) return reply({ error: 'AI service is not configured' }, 503, origin);
