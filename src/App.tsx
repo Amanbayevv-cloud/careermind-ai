@@ -1436,6 +1436,8 @@ export default function App() {
   }, [chatMessages, session?.user.id, authReady, localDataOwner]);
 
   const t = TRANSLATIONS[lang];
+  const additionalLang = {"direction":["Yo'nalish: ","Направление: ","Career: "],"unratedInfo":["Ko‘nikma hali baholanmagan bo‘lsa, 0 yoki 1 ball deb hisoblanmaydi. Profil yoki test orqali baholang.","Если навык не оценён, он не считается равным 0 или 1. Оцените его в профиле или тесте.","Unrated skills are not treated as 0 or 1. Rate them in your profile or assessment."],"sampleWarning":["Kasb yo‘nalishlari katalogi. Quyidagi maosh, masofaviy ish va o‘sish raqamlari tasdiqlanmagan namuna qiymatlar; qaror qabul qilish uchun ularga tayanmang.","Каталог профессий. Зарплаты, удалённая работа и темпы роста не проверены; не основывайте на них решения.","Career directory. Salary, remote-work and growth figures are unverified examples; do not rely on them when making decisions."],"catalogButton":["Career Matching 3.0 — aqlli tavsiyalar","Career Matching 3.1 — рекомендации","Career Matching 3.1 — recommendations"],"details":["Batafsil ko‘rish","Подробнее","View details"],"newTest":["Yangi: Assessment 3.0 — 30 savolni boshlash","Новое: Assessment 3.0 — начать 30 вопросов","New: Assessment 3.0 — start 30 questions"],"adaptiveTest":["Adaptive Assessment 3.1 ni boshlash","Начать Adaptive Assessment 3.1","Start Adaptive Assessment 3.1"],"complete":["yakunlandi","завершено","completed"],"validation":["Davom etish uchun ism-familiya, yosh, ta’lim darajasi, ta’lim muassasasi va yo‘nalishni to‘ldiring.","Для продолжения заполните имя, возраст, уровень образования, учебное заведение и специальность.","To continue, enter your name, age, education level, institution, and field of study."]};
+  const lx=(key:keyof typeof additionalLang)=>additionalLang[key][lang==='uz'?0:lang==='ru'?1:2];
   const extraI18n = {"settingsSubtitle":["Tizim parametrlari va ma'lumotlar boshqaruvi.","Управление настройками и данными.","Manage settings and stored data."],"retakeSubtitle":["Yangi ma'lumotlar bilan qayta test topshirish.","Пройти тест повторно с новыми данными.","Retake the assessment with updated information."],"start":["Testni boshlash","Начать тест","Start assessment"],"clearSubtitle":["Barcha saqlangan progress va xabarlarni tozalash.","Очистить сохранённый локальный прогресс и сообщения.","Clear locally saved progress and messages."],"delete":["O'chirish","Очистить","Clear"],"compareWarning":["Maosh, talab, masofaviy ish va o‘sish ko‘rsatkichlari tasdiqlanmagan namuna qiymatlar — real bozor statistikasi emas.","Данные о зарплате, спросе, удалённой работе и росте не подтверждены и не являются рыночной статистикой.","Salary, demand, remote-work and growth data are unverified examples, not actual market statistics."],"loading":["Oxirgi test yuklanmoqda…","Загружается последний тест…","Loading latest assessment…"],"included":[" hisobga olindi (45% ko‘nikma + 25% qiziqish + 30% test)."," учтён (45% навыки + 25% интересы + 30% тест)."," included (45% skills + 25% interests + 30% assessment)."],"noTest":["Test saqlanmagan: 65% ko‘nikma + 35% qiziqish.","Нет сохранённого теста: 65% навыки + 35% интересы.","No saved assessment: 65% skills + 35% interests."],"needsData":["Moslik uchun kamida 3 ta baholangan ko‘nikma va 1 ta qiziqish zarur.","Для расчёта нужны не менее 3 оценённых навыков и 1 интерес.","A match requires at least 3 rated skills and 1 interest."],"fit":["Moslik ko'rsatkichi","Соответствие","Career fit"],"unrated":["Baholanmagan","Не оценено","Not assessed"],"awaiting":["Manba kutilmoqda","Источник не указан","Source pending"],"support":["Yordam","Помощь","Help"]};
   const tx=(key: keyof typeof extraI18n)=>extraI18n[key][lang==='uz'?0:lang==='ru'?1:2];
 
@@ -1981,7 +1983,7 @@ export default function App() {
   const renderAssessment = () => {
     const handleNext = () => {
       if (assessmentStep === 1 && !profileIsValid) {
-        setAssessmentValidationNotice('Davom etish uchun ism-familiya, yosh, ta’lim darajasi, ta’lim muassasasi va yo‘nalishni to‘ldiring.');
+        setAssessmentValidationNotice('lx('validation')');
         return;
       }
       setAssessmentValidationNotice('');
@@ -2016,7 +2018,7 @@ export default function App() {
             <span className="font-semibold text-cyan-400">
               {t.step} {assessmentStep} {t.of} 6
             </span>
-            <span>{Math.round((assessmentStep / 6) * 100)}% yakunlandi</span>
+            <span>{Math.round((assessmentStep / 6) * 100)}% {lx('complete')}</span>
           </div>
           <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
             <div
@@ -2438,7 +2440,7 @@ export default function App() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         <div>
           <h2 className="text-2xl font-black text-white">{t.careers}</h2>
-          <p className="text-xs text-slate-400 mt-1">Kasb yo‘nalishlari katalogi. Quyidagi maosh, masofaviy ish va o‘sish raqamlari tasdiqlanmagan namuna qiymatlar; qaror qabul qilish uchun ularga tayanmang.</p>
+          <p className="text-xs text-slate-400 mt-1">{lx('sampleWarning')}</p>
         </div>
 
         {/* Filter & Search Bar */}
@@ -2675,11 +2677,11 @@ export default function App() {
       <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
         <div>
           <h2 className="text-2xl font-black text-white">{t.skillGapTitle}</h2>
-          <p className="text-xs text-slate-400 mt-1">{t.skillGapDesc} (Yo'nalish: <span className="text-cyan-400 font-bold">{career.titleKey}</span>)</p>
+          <p className="text-xs text-slate-400 mt-1">{t.skillGapDesc} ({lx('direction')}<span className="text-cyan-400 font-bold">{career.titleKey}</span>)</p>
         </div>
 
         <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 sm:p-8 backdrop-blur-md space-y-6">
-          <p className="text-xs text-slate-400">Ko‘nikma hali baholanmagan bo‘lsa, 0 yoki 1 ball deb hisoblanmaydi. Profil yoki test orqali baholang.</p>
+          <p className="text-xs text-slate-400">{lx('unratedInfo')}</p>
           <div className="grid gap-5">
             {Object.entries(career.requiredSkills).map(([skillKey, requiredVal]) => {
               const userVal = profile.skills[skillKey as keyof SkillRatings] ?? 0;
@@ -3145,16 +3147,16 @@ export default function App() {
           </main>
         ) : <main className="transition-all duration-300">
           {activeTab === 'home' && renderLandingPage()}
-          {activeTab === 'assessment' && <><div className="max-w-4xl mx-auto px-4 pt-6"><button onClick={() => setActiveTab('assessmentV3')} className="bg-cyan-700 hover:bg-cyan-600 text-white rounded-xl px-5 py-3 font-bold">Yangi: Assessment 3.0 — 30 savolni boshlash</button></div>{renderAssessment()}</>}
-          {activeTab === 'assessmentV3' && <><div className="max-w-4xl mx-auto px-4 pt-6"><button onClick={() => setActiveTab('adaptiveAssessment')} className="bg-purple-700 hover:bg-purple-600 text-white rounded-xl px-5 py-3 font-bold">Adaptive Assessment 3.1 ni boshlash</button></div><AssessmentV3 session={session} /></>}
+          {activeTab === 'assessment' && <><div className="max-w-4xl mx-auto px-4 pt-6"><button onClick={() => setActiveTab('assessmentV3')} className="bg-cyan-700 hover:bg-cyan-600 text-white rounded-xl px-5 py-3 font-bold">{lx('newTest')}</button></div>{renderAssessment()}</>}
+          {activeTab === 'assessmentV3' && <><div className="max-w-4xl mx-auto px-4 pt-6"><button onClick={() => setActiveTab('adaptiveAssessment')} className="bg-purple-700 hover:bg-purple-600 text-white rounded-xl px-5 py-3 font-bold">{lx('adaptiveTest')}</button></div><AssessmentV3 session={session} /></>}
           {activeTab === 'adaptiveAssessment' && <AdaptiveAssessment session={session} />}
           {(activeTab === 'dashboard' || activeTab === 'dashboardV2') && <DashboardV2 lang={lang} session={session} onGo={setActiveTab} profile={{interests:profile.interests,skills:{...profile.skills}}} careers={CAREER_DATABASE.map(c=>({id:c.id,title:c.titleKey,category:c.category,description:c.descriptionKey,requiredSkills:c.requiredSkills as Record<string,number>,associatedInterests:c.associatedInterests}))} selectedCareer={profile.selectedCareerId ? selectedCareer.titleKey : null} />}
           {activeTab === 'careers' && <><div className="max-w-5xl mx-auto px-4 pt-6"><button onClick={() => setActiveTab('careerMatchingV3')} className="bg-cyan-700 hover:bg-cyan-600 text-white rounded-xl px-5 py-3 font-bold">Career Matching 3.0 — aqlli tavsiyalar</button></div>{renderCareerDirectory()}</>}
           {activeTab === 'careerMatchingV3' && <CareerMatchingV3 lang={lang} session={session} profile={{interests:profile.interests,skills:{...profile.skills}}} careers={CAREER_DATABASE.map(c=>({id:c.id,title:c.titleKey,category:c.category,description:c.descriptionKey,requiredSkills:c.requiredSkills as Record<string,number>,associatedInterests:c.associatedInterests}))} onChoose={(id)=>{setProfile(p=>({...p,selectedCareerId:id}));setActiveTab('smartRoadmap');}} />}
           {activeTab === 'myCareer' && renderCareerDetails()}
           {activeTab === 'skillGap' && renderSkillGap()}
-          {activeTab === 'roadmap' && <SmartRoadmap session={session} career={selectedCareer.titleKey} />}
-          {activeTab === 'smartRoadmap' && <SmartRoadmap session={session} career={selectedCareer.titleKey} />}
+          {activeTab === 'roadmap' && <SmartRoadmap lang={lang} session={session} career={selectedCareer.titleKey} />}
+          {activeTab === 'smartRoadmap' && <SmartRoadmap lang={lang} session={session} career={selectedCareer.titleKey} />}
           {activeTab === 'compare' && renderCareerComparison()}
           {activeTab === 'assistant' && renderAiAssistant()}
           {activeTab === 'profile' && renderProfile()}
