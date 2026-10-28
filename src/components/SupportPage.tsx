@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { requireSupabase } from '../services/supabaseClient';
 
@@ -14,24 +14,30 @@ export default function SupportPage({ session, onGoProfile, lang }: { session: S
   const [notice, setNotice] = useState('');
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(false);
+  const generation = useRef(0);
+  const owner = useRef<string | null>(null);
+  if (owner.current !== (session?.user.id ?? null)) { owner.current = session?.user.id ?? null; generation.current += 1; }
   const loadTickets = async () => {
-    if (!session) return;
+    const token = ++generation.current;
+    if (!session) { setTickets([]); setLoading(false); return; }
+    setTickets([]);
     setLoading(true);
     try {
       const { data, error } = await requireSupabase().from('support_tickets')
         .select('id,subject,category,status,created_at')
         .eq('user_id', session.user.id).order('created_at', { ascending: false }).limit(20);
       if (error) throw error;
-      setTickets((data || []) as Ticket[]);
+      if (token === generation.current) setTickets((data || []) as Ticket[]);
     } catch (e) {
-      setNotice(e instanceof Error ? e.message : tx(34));
-    } finally { setLoading(false); }
+      if (token === generation.current) setNotice(e instanceof Error ? e.message : tx(34));
+    } finally { if (token === generation.current) setLoading(false); }
   };
   useEffect(() => {
-    if (!session) { setTickets([]); return; }
+    if (!session) { generation.current++; setTickets([]); return; }
     void loadTickets();
     // Loading history on account change only; manual Refresh button for updates.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => { generation.current++; };
   }, [session?.user.id]);
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
