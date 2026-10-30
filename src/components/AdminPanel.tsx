@@ -23,6 +23,8 @@ export default function AdminPanel({ session }: { session: Session | null }) {
   const [notes, setNotes] = useState<AdminNote[]>([]);
   const [audit, setAudit] = useState<Audit[]>([]);
   const [saving, setSaving] = useState<string | null>(null);
+  const [testingQuota,setTestingQuota] = useState(false);
+  const [quotaCodes,setQuotaCodes] = useState<number[]>([]);
 
   async function refresh(userId: string) {
     const db = requireSupabase();
@@ -96,6 +98,23 @@ export default function AdminPanel({ session }: { session: Session | null }) {
     } catch(e) { setError(e instanceof Error ? e.message : 'Javob yuborilmadi'); }
     finally { setSaving(null); }
   }
+  async function testQuota() {
+    if (!session || !authorized || testingQuota) return;
+    setTestingQuota(true); setQuotaCodes([]); setError('');
+    const codes: number[] = [];
+    try {
+      const db = requireSupabase();
+      for (let i=0; i<6; i++) {
+        if ((await db.auth.getUser()).data.user?.id !== session.user.id) throw new Error('Sessiya o‘zgardi. Test to‘xtatildi.');
+        const { data, error } = await db.functions.invoke('career-chat',{body:{message:'CareerMind API rate limit sinovi'}});
+        void data;
+        const status = error ? (('context' in error && error.context instanceof Response) ? error.context.status : 0) : 200;
+        codes.push(status); setQuotaCodes([...codes]);
+        if (status===0) break;
+      }
+    } catch(e) {setError(e instanceof Error ? e.message : 'HTTP sinovda xatolik yuz berdi');}
+    finally {setTestingQuota(false);}
+  }
   const filtered = tickets.filter(t => (filter === 'all' || t.status === filter) && [t.subject,t.category,t.description].some(v => v.toLowerCase().includes(query.toLowerCase())));
   const statusCounts = {open:tickets.filter(t=>t.status==='open').length,in_progress:tickets.filter(t=>t.status==='in_progress').length,resolved:tickets.filter(t=>t.status==='resolved').length};
   return <section className="max-w-6xl mx-auto px-4 py-8 space-y-6 text-white">
@@ -106,6 +125,13 @@ export default function AdminPanel({ session }: { session: Session | null }) {
     {error && <p role="alert" className="text-amber-300">{error}</p>}
     {!loading && authorized && <>
       <p className="text-slate-400 text-sm">Oxirgi 100 ta profil va murojaat. To‘liq statistika emas.</p>
+      <div className="rounded-xl border border-slate-700 bg-slate-900 p-5 space-y-3">
+        <h2 className="text-xl font-bold">Release Audit — HTTP Rate Limiting</h2>
+        <p className="text-sm text-slate-400">Test 6 ta API so‘rov yuboradi. Token ko‘rsatilmaydi. Har bir so‘rov foydalanuvchi limitini vaqtincha band qiladi. API kaliti bo‘lmasa dastlabki javoblar 503 bo‘lishi mumkin; limit oshganda 429 kutiladi.</p>
+        <button type="button" disabled={testingQuota} onClick={()=>void testQuota()} className="rounded-lg bg-indigo-600 px-4 py-2 disabled:opacity-50">{testingQuota?'Sinov bajarilmoqda…':'6 ta HTTP so‘rov bilan tekshirish'}</button>
+        {quotaCodes.length>0 && <p role="status" className="text-sm text-cyan-200">HTTP statuslar: {quotaCodes.join(' → ')}</p>}
+        {!testingQuota && quotaCodes.length===6 && <p className="text-sm">{quotaCodes[5]===429?'✅ Oltinchi so‘rov HTTP 429 qaytardi.': '⚠️ Oltinchi so‘rov 429 qaytarmadi — qo‘shimcha tekshiruv kerak.'}</p>}
+      </div>
       <div className="grid sm:grid-cols-2 gap-4">
         <div className="rounded-xl border border-slate-700 bg-slate-900 p-5"><p className="text-slate-400">Ko‘rsatilgan profillar</p><p className="text-3xl font-bold">{profiles.length}{profiles.length===100?'+':''}</p></div>
         <div className="rounded-xl border border-slate-700 bg-slate-900 p-5"><p className="text-slate-400">Ko‘rsatilgan murojaatlar</p><p className="text-3xl font-bold">{tickets.length}{tickets.length===100?'+':''}</p></div>
