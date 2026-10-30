@@ -1315,6 +1315,23 @@ export default function App() {
   const [chatInput, setChatInput] = useState('');
   const [isAiTyping, setIsAiTyping] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    setIsAdmin(false);
+    if (!session?.user.id || !supabase) return () => { alive = false; };
+    const owner = session.user.id;
+    void (async () => {
+      try {
+        const db = requireSupabase();
+        const { data: userData, error: userError } = await db.auth.getUser();
+        if (userError || userData.user?.id !== owner) return;
+        const { data, error } = await db.rpc('is_careermind_admin');
+        if (alive && !error && (await db.auth.getUser()).data.user?.id === owner) setIsAdmin(data === true);
+      } catch { if (alive) setIsAdmin(false); }
+    })();
+    return () => { alive = false; };
+  }, [session?.user.id]);
   useEffect(() => {
     if (!supabase) return;
     let mounted = true;
@@ -3073,7 +3090,7 @@ export default function App() {
         </div>
 
         <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 sm:p-8 backdrop-blur-md space-y-6">
-          <button type="button" onClick={() => setActiveTab('admin')} className="rounded-xl border border-indigo-500/30 bg-indigo-950/30 px-4 py-3 text-sm font-semibold text-indigo-200">Admin Panel (ruxsat talab qilinadi)</button>
+          {isAdmin && <button type="button" onClick={() => setActiveTab('admin')} className="rounded-xl border border-indigo-500/30 bg-indigo-950/30 px-4 py-3 text-sm font-semibold text-indigo-200">Admin Panel</button>}
           {/* Language Switch */}
           <div>
             <label className="block text-xs font-bold text-slate-300 mb-2">{t.languageSelect}</label>
@@ -3163,7 +3180,7 @@ export default function App() {
           {activeTab === 'assistant' && renderAiAssistant()}
           {activeTab === 'profile' && renderProfile()}
           {activeTab === 'settings' && renderSettings()}
-          {activeTab === 'admin' && <Suspense fallback={<p role="status" className="px-4 py-6 text-slate-300">Admin Panel yuklanmoqda…</p>}><AdminPanel key={session?.user.id ?? 'guest'} session={session} /></Suspense>}
+          {activeTab === 'admin' && isAdmin && <Suspense fallback={<p role="status" className="px-4 py-6 text-slate-300">Admin Panel yuklanmoqda…</p>}><AdminPanel key={session?.user.id ?? 'guest'} session={session} /></Suspense>}
           {activeTab === 'support' && <Suspense fallback={<p role="status" className="px-4 py-6 text-slate-300">Sahifa yuklanmoqda…</p>}><SupportPage key={session?.user.id ?? 'guest'} lang={lang} session={session} onGoProfile={() => setActiveTab('profile')} /></Suspense>}
         </main>}
         <nav aria-label="Tezkor mobil navigatsiya" className="xl:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-4 gap-1 border-t border-slate-700 bg-slate-950/95 px-2 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur-xl">
