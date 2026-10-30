@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { requireSupabase } from '../services/supabaseClient';
 
+type PublicReply = { id:string; ticket_id:string; message:string; created_at:string };
 type Ticket = { id: string; subject: string; category: string; status: string; created_at: string };
 const strings = {"uz":["Qo‘llab-quvvatlash","Savollaringizni toping yoki muammo haqida murojaat qoldiring.","Ko‘p so‘raladigan savollar","Test natijalari qayerda saqlanadi?","Tizimga kirgan bo‘lsangiz, Assessment 2.0 natijalarini maxsus tugma orqali bulutga saqlashingiz mumkin.","Profilimni boshqa qurilmada ochsam bo‘ladimi?","Bir xil hisobga kiring, Profil sahifasidagi “Bulutdan yuklash” tugmasini bosing.","AI maslahatchi ishlamayaptimi?","Haqiqiy AI xizmati hozircha API kalitisiz faol emas. Mehmon rejimida oddiy avtomatik maslahatlar mavjud.","Parolimni unutdim. Nima qilaman?","Hisobni tiklash funksiyasi hali ishlab chiqilmoqda. Parolingizni yoki maxfiy kalitlaringizni murojaatga yozmang.","Yangi murojaat","Maxfiy parollar, API kalitlari, tokenlar yoki shaxsiy hujjatlarni yubormang. Murojaatlar faqat loyihaning Supabase bazasiga yoziladi; avtomatik email xabarnomasi hozircha yo‘q.","Murojaat yuborish uchun hisobga kiring.","Profilga o‘tish","Mavzu turi","Texnik muammo","Hisob va login","Test natijalari","Taklif","Boshqa","Sarlavha","Masalan: Test natijam saqlanmayapti","Muammo tafsilotlari","Qanday muammo yuz berdi? Maxfiy ma'lumotlarni kiritmang.","Yuborilmoqda…","Murojaat yuborish","Mening murojaatlarim","Yangilash","Yuklanmoqda…","Hozircha murojaat yo‘q.","Yechilgan","Ko‘rib chiqilmoqda","Ochiq","Murojaatlar yuklanmadi","Sarlavha kamida 5, xabar kamida 15 belgidan iborat bo‘lsin.","Murojaat saqlandi. Holatini quyidagi ro‘yxatdan tekshirishingiz mumkin.","Murojaat yuborilmadi: ","noma’lum xatolik"],"ru":["Поддержка","Найдите ответ или отправьте обращение.","Частые вопросы","Где сохраняются результаты теста?","После входа результаты тестов можно сохранить в облаке специальной кнопкой.","Можно ли открыть профиль на другом устройстве?","Войдите в тот же аккаунт и нажмите «Загрузить из облака» в профиле.","Почему не работает AI-консультант?","Для полноценного AI необходим серверный API-ключ. Гостевой режим предлагает простые автоматические подсказки.","Я забыл пароль. Что делать?","Восстановление аккаунта ещё разрабатывается. Не отправляйте пароли или секретные ключи.","Новое обращение","Не отправляйте пароли, API-ключи, токены или личные документы. Обращения сохраняются в Supabase; уведомлений по email пока нет.","Для отправки обращения войдите в аккаунт.","Перейти в профиль","Категория","Техническая проблема","Аккаунт и вход","Результаты теста","Предложение","Другое","Тема","Например: результат теста не сохраняется","Описание проблемы","Опишите проблему. Не указывайте секретные данные.","Отправка…","Отправить обращение","Мои обращения","Обновить","Загрузка…","Обращений пока нет.","Решено","На рассмотрении","Открыто","Не удалось загрузить обращения","Тема должна содержать минимум 5 символов, описание — минимум 15.","Обращение сохранено. Статус отображается ниже.","Не удалось отправить: ","неизвестная ошибка"],"en":["Support","Find answers or submit a support request.","Frequently asked questions","Where are assessment results saved?","When signed in, you can save assessment results to the cloud using the save button.","Can I access my profile on another device?","Sign in to the same account and select “Load from cloud” on your profile.","Why isn't the AI assistant working?","The real AI service needs a server-side API key. Guest mode offers basic automated suggestions.","I forgot my password. What should I do?","Account recovery is being developed. Do not include passwords or secret keys in support requests.","New request","Do not send passwords, API keys, tokens, or identity documents. Requests are saved in Supabase; email notifications are not enabled.","Sign in to submit a request.","Go to profile","Category","Technical issue","Account and login","Assessment results","Suggestion","Other","Subject","Example: My assessment result is not saving","Issue details","Describe what happened. Do not include sensitive information.","Sending…","Submit request","My requests","Refresh","Loading…","No requests yet.","Resolved","In progress","Open","Couldn't load requests","Subject must be at least 5 characters, and the description at least 15.","Request saved. You can check its status below.","Submission failed: ","unknown error"]};
 export default function SupportPage({ session, onGoProfile, lang }: { session: Session | null; onGoProfile: () => void; lang: 'uz'|'ru'|'en' }) {
@@ -13,27 +14,35 @@ export default function SupportPage({ session, onGoProfile, lang }: { session: S
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [replies,setReplies] = useState<PublicReply[]>([]);
   const [loading, setLoading] = useState(false);
   const generation = useRef(0);
   const owner = useRef<string | null>(null);
   if (owner.current !== (session?.user.id ?? null)) { owner.current = session?.user.id ?? null; generation.current += 1; }
   const loadTickets = async () => {
     const token = ++generation.current;
-    if (!session) { setTickets([]); setLoading(false); return; }
-    setTickets([]);
+    if (!session) { setTickets([]); setReplies([]); setLoading(false); return; }
+    setTickets([]); setReplies([]);
     setLoading(true);
     try {
       const { data, error } = await requireSupabase().from('support_tickets')
         .select('id,subject,category,status,created_at')
         .eq('user_id', session.user.id).order('created_at', { ascending: false }).limit(20);
       if (error) throw error;
-      if (token === generation.current) setTickets((data || []) as Ticket[]);
+      const ids = (data || []).map(t => t.id as string);
+      let responseList: PublicReply[] = [];
+      if (ids.length) {
+        const repliesQuery = await requireSupabase().from('support_replies').select('id,ticket_id,message,created_at').in('ticket_id',ids).order('created_at',{ascending:true}).limit(100);
+        if (repliesQuery.error) throw repliesQuery.error;
+        responseList = (repliesQuery.data || []) as PublicReply[];
+      }
+      if (token === generation.current) { setTickets((data || []) as Ticket[]); setReplies(responseList); }
     } catch (e) {
       if (token === generation.current) setNotice(e instanceof Error ? e.message : tx(34));
     } finally { if (token === generation.current) setLoading(false); }
   };
   useEffect(() => {
-    if (!session) { generation.current++; setTickets([]); return; }
+    if (!session) { generation.current++; setTickets([]); setReplies([]); return; }
     void loadTickets();
     // Loading history on account change only; manual Refresh button for updates.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -97,6 +106,7 @@ export default function SupportPage({ session, onGoProfile, lang }: { session: S
       {tickets.map(t => <div key={t.id} className="border border-slate-700 rounded-xl p-3 flex flex-wrap justify-between gap-2">
         <div><p className="text-white font-semibold">{t.subject}</p><p className="text-slate-500 text-xs">{new Date(t.created_at).toLocaleString()}</p></div>
         <span className="text-cyan-300 text-sm">{t.status === 'resolved' ? tx(31) : t.status === 'in_progress' ? tx(32) : tx(33)}</span>
+        {replies.filter(r=>r.ticket_id===t.id).map(r=><div key={r.id} className="w-full bg-cyan-950/40 border border-cyan-800/40 rounded-lg p-3"><p className="text-cyan-200 font-semibold text-sm">{lang==='ru'?'Ответ администратора':lang==='en'?'Administrator reply':'Administrator javobi'}</p><p className="text-slate-200 text-sm whitespace-pre-wrap break-words mt-1">{r.message}</p><p className="text-xs text-slate-400 mt-2">{new Date(r.created_at).toLocaleString()}</p></div>)}
       </div>)}
     </section>}
   </main>;
