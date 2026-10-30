@@ -25,6 +25,7 @@ export default function AdminPanel({ session }: { session: Session | null }) {
   const [saving, setSaving] = useState<string | null>(null);
   const [testingQuota,setTestingQuota] = useState(false);
   const [quotaCodes,setQuotaCodes] = useState<number[]>([]);
+  const [quotaDiagnostic,setQuotaDiagnostic] = useState('');
 
   async function refresh(userId: string) {
     const db = requireSupabase();
@@ -100,7 +101,7 @@ export default function AdminPanel({ session }: { session: Session | null }) {
   }
   async function testQuota() {
     if (!session || !authorized || testingQuota) return;
-    setTestingQuota(true); setQuotaCodes([]); setError('');
+    setTestingQuota(true); setQuotaCodes([]); setQuotaDiagnostic(''); setError('');
     const codes: number[] = [];
     try {
       const db = requireSupabase();
@@ -108,7 +109,9 @@ export default function AdminPanel({ session }: { session: Session | null }) {
         if ((await db.auth.getUser()).data.user?.id !== session.user.id) throw new Error('Sessiya o‘zgardi. Test to‘xtatildi.');
         const { data, error } = await db.functions.invoke('career-chat',{body:{message:'CareerMind API rate limit sinovi'}});
         void data;
-        const status = error ? (('context' in error && error.context instanceof Response) ? error.context.status : 0) : 200;
+        const context = error && 'context' in error ? error.context : null;
+        const status = error ? (context && typeof context === 'object' && 'status' in context && typeof context.status === 'number' ? context.status : 0) : 200;
+        if (error) setQuotaDiagnostic(`${error.name}: ${error.message}${status===0?' — HTTP javobi olinmadi. CORS, tarmoq yoki Edge Function sozlamasini tekshiring.':''}`);
         codes.push(status); setQuotaCodes([...codes]);
         if (status===0) break;
       }
@@ -129,6 +132,7 @@ export default function AdminPanel({ session }: { session: Session | null }) {
         <h2 className="text-xl font-bold">Release Audit — HTTP Rate Limiting</h2>
         <p className="text-sm text-slate-400">Test 6 ta API so‘rov yuboradi. Token ko‘rsatilmaydi. Har bir so‘rov foydalanuvchi limitini vaqtincha band qiladi. API kaliti bo‘lmasa dastlabki javoblar 503 bo‘lishi mumkin; limit oshganda 429 kutiladi.</p>
         <button type="button" disabled={testingQuota} onClick={()=>void testQuota()} className="rounded-lg bg-indigo-600 px-4 py-2 disabled:opacity-50">{testingQuota?'Sinov bajarilmoqda…':'6 ta HTTP so‘rov bilan tekshirish'}</button>
+        {quotaDiagnostic && <p role="alert" className="text-sm text-amber-300 break-words">{quotaDiagnostic}</p>}
         {quotaCodes.length>0 && <p role="status" className="text-sm text-cyan-200">HTTP statuslar: {quotaCodes.join(' → ')}</p>}
         {!testingQuota && quotaCodes.length===6 && <p className="text-sm">{quotaCodes[5]===429?'✅ Oltinchi so‘rov HTTP 429 qaytardi.': '⚠️ Oltinchi so‘rov 429 qaytarmadi — qo‘shimcha tekshiruv kerak.'}</p>}
       </div>
