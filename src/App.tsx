@@ -1,4 +1,17 @@
-import { useState, useEffect, useMemo } from 'react';
+import { lazy, Suspense, useState, useEffect, useMemo } from 'react';
+const AccountPanel = lazy(() => import('./components/AccountPanel'));
+const SupportPage = lazy(() => import('./components/SupportPage'));
+const AdminPanel = lazy(() => import('./components/AdminPanel'));
+const ObjectiveAssessment = lazy(() => import('./components/ObjectiveAssessment'));
+const AssessmentV3 = lazy(() => import('./components/AssessmentV3'));
+const AdaptiveAssessment = lazy(() => import('./components/AdaptiveAssessment'));
+const SmartRoadmap = lazy(() => import('./components/SmartRoadmap'));
+const CareerMatchingV3 = lazy(() => import('./components/CareerMatchingV3'));
+const DashboardV2 = lazy(() => import('./components/DashboardV2'));
+import { hasMatchingData, rankCareers, type MatchTest } from './services/careerMatching';
+import { askCareerAI } from './services/careerBackend';
+import { requireSupabase, supabase } from './services/supabaseClient';
+import type { Session } from '@supabase/supabase-js';
 import {
   Compass,
   Briefcase,
@@ -6,7 +19,6 @@ import {
   BarChart3,
   Laptop,
   CheckCircle2,
-  Circle,
   ArrowRight,
   ArrowLeft,
   Sparkles,
@@ -15,7 +27,6 @@ import {
   User,
   Settings as SettingsIcon,
   Flame,
-  Award,
   Zap,
   Search,
   Check,
@@ -1138,52 +1149,33 @@ const CAREER_DATABASE: CareerRequirement[] = [
 ];
 
 const INITIAL_PROFILE: UserProfile = {
-  name: 'Azizbek',
-  age: 23,
-  educationLevel: 'bachelor',
-  university: 'Tashkent University of Information Technologies',
-  fieldOfStudy: 'Computer Science',
-  yearsOfExperience: 1,
+  name: '',
+  age: 0,
+  educationLevel: '' as EducationLevel,
+  university: '',
+  fieldOfStudy: '',
+  yearsOfExperience: 0,
   skills: {
-    programming: 7,
-    mathematics: 6,
-    problemSolving: 8,
-    dataAnalysis: 6,
-    communication: 6,
-    creativity: 5,
-    leadership: 5,
-    research: 6,
-    design: 4,
-    management: 4
+    programming: 0, mathematics: 0, problemSolving: 0, dataAnalysis: 0,
+    communication: 0, creativity: 0, leadership: 0, research: 0,
+    design: 0, management: 0
   },
-  interests: ['Artificial Intelligence', 'Software Development', 'Data Science'],
+  interests: [],
   personality: {
-    analyticalThinking: 8,
-    creativity: 6,
-    leadership: 6,
-    socialInteraction: 5,
-    independence: 8,
-    riskTolerance: 6,
-    attentionToDetail: 7,
-    adaptability: 8
+    analyticalThinking: 0, creativity: 0, leadership: 0, socialInteraction: 0,
+    independence: 0, riskTolerance: 0, attentionToDetail: 0, adaptability: 0
   },
   preferences: {
-    workType: 'remote',
-    salaryImportance: 9,
-    workLifeBalance: 7,
-    careerGrowth: 9,
-    jobStability: 6,
-    internationalOpportunities: 9
+    workType: '' as WorkType, salaryImportance: 0, workLifeBalance: 0,
+    careerGrowth: 0, jobStability: 0, internationalOpportunities: 0
   },
-  careerGoal: 'international_remote',
-  assessmentCompleted: true,
-  selectedCareerId: 'ai-engineer',
-  xp: 320,
-  streakDays: 4,
-  completedTasks: {
-    'ai-m1-1': true
-  },
-  unlockedBadges: ['first_assessment', 'streak_starter']
+  careerGoal: '' as CareerGoal,
+  assessmentCompleted: false,
+  selectedCareerId: null,
+  xp: 0,
+  streakDays: 0,
+  completedTasks: {},
+  unlockedBadges: []
 };
 
 function calculateCareerScores(profile: UserProfile): { career: CareerRequirement; matchScore: number; strengths: string[]; missingSkills: string[] }[] {
@@ -1265,7 +1257,7 @@ function calculateCareerScores(profile: UserProfile): { career: CareerRequiremen
 
     return {
       career,
-      matchScore: Math.min(99, Math.max(48, totalMatch)),
+      matchScore: Math.min(99, Math.max(0, totalMatch)),
       strengths: strengths.slice(0, 3),
       missingSkills: missingSkills.slice(0, 3)
     };
@@ -1284,19 +1276,11 @@ export default function App() {
 
   const [activeTab, setActiveTab] = useState<string>('home');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Persistence of Profile
-  const [profile, setProfile] = useState<UserProfile>(() => {
-    try {
-      const saved = localStorage.getItem('careermind_profile');
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-    return INITIAL_PROFILE;
-  });
+  const [profile, setProfile] = useState<UserProfile>(INITIAL_PROFILE);
 
   // Selected Career ID for details view
   const [inspectedCareerId, setInspectedCareerId] = useState<string>('ai-engineer');
@@ -1305,33 +1289,144 @@ export default function App() {
   const [compareCareerIds, setCompareCareerIds] = useState<string[]>(['ai-engineer', 'data-scientist']);
 
   // Chat message state
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => {
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+
+  // Keep cached profile/chat separate for each auth identity; never share guest data with accounts.
+  const [localDataOwner, setLocalDataOwner] = useState('guest');
+  const [authReady, setAuthReady] = useState(false);
+  const defaultChat: ChatMessage[] = [{
+    id: 'msg-1', sender: 'ai',
+    text: "Assalomu alaykum! Men CareerMind AI karyera maslahatchisiman.",
+    timestamp: '10:30'
+  }];
+  const readScopedData = (owner: string) => {
     try {
-      const saved = localStorage.getItem('careermind_chat');
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (e) {
-      console.error(e);
+      const rawProfile = owner === 'guest' ? null : localStorage.getItem('careermind_profile_' + owner);
+      const rawChat = owner === 'guest' ? null : localStorage.getItem('careermind_chat_' + owner);
+      return {
+        profile: rawProfile ? JSON.parse(rawProfile) as UserProfile : { ...INITIAL_PROFILE },
+        chat: rawChat ? JSON.parse(rawChat) as ChatMessage[] : defaultChat
+      };
+    } catch {
+      return { profile: { ...INITIAL_PROFILE }, chat: defaultChat };
     }
-    return [
-      {
-        id: 'msg-1',
-        sender: 'ai',
-        text: "Assalomu alaykum! Men CareerMind AI karyera maslahatchisiman. Sizga qaysi sohani o'rganish, qanday ko'nikmalarni kuchaytirish yoki qanday qilib yuqori daromadli masofaviy ish topish bo'yicha yordam bera olaman?",
-        timestamp: '10:30',
-        quickReplies: [
-          "Qaysi kasb menga eng mos keladi?",
-          "Ushbu oyda nimani o'rganishim kerak?",
-          "AI Engineer bo'lish uchun qaysi bilimlarim yetishmayapti?",
-          "Qanday qilib xalqaro masofaviy ish topish mumkin?"
-        ]
-      }
-    ];
-  });
+  };
 
   const [chatInput, setChatInput] = useState('');
   const [isAiTyping, setIsAiTyping] = useState(false);
+  const [session, setSession] = useState<Session | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    setIsAdmin(false);
+    if (!session?.user.id || !supabase) return () => { alive = false; };
+    const owner = session.user.id;
+    void (async () => {
+      try {
+        const db = requireSupabase();
+        const { data: userData, error: userError } = await db.auth.getUser();
+        if (userError || userData.user?.id !== owner) return;
+        const { data, error } = await db.rpc('is_careermind_admin');
+        if (alive && !error && (await db.auth.getUser()).data.user?.id === owner) setIsAdmin(data === true);
+      } catch { if (alive) setIsAdmin(false); }
+    })();
+    return () => { alive = false; };
+  }, [session?.user.id]);
+  useEffect(() => {
+    if (!supabase) return;
+    let mounted = true;
+    void supabase.auth.getSession().then(({ data }) => { if (mounted) { setSession(data.session); setAuthReady(true); } }).catch(() => { if (mounted) setAuthReady(true); });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, next) => {
+      if (mounted) { setSession(next); setAuthReady(true); }
+    });
+    return () => { mounted = false; subscription.unsubscribe(); };
+  }, []);
+
+  useEffect(() => {
+    if (!authReady) return;
+    const owner = session?.user.id ?? 'guest';
+    if (owner === localDataOwner) return;
+    const stored = readScopedData(owner);
+    setProfile(stored.profile);
+    setChatMessages(stored.chat);
+    setLocalDataOwner(owner);
+  }, [authReady, session?.user.id, localDataOwner]);
+
+  const [comparisonTest, setComparisonTest] = useState<MatchTest|null>(null);
+  const [comparisonLoading, setComparisonLoading] = useState(false);
+  useEffect(() => {
+    let alive=true;
+    setComparisonTest(null);
+    if (!session) return () => {alive=false};
+    setComparisonLoading(true);
+    void Promise.resolve(requireSupabase().from('assessment_attempts')
+      .select('version,results').eq('user_id',session.user.id)
+      .in('version',['3.0','3.1-adaptive'])
+      .order('created_at',{ascending:false}).limit(1))
+      .then(({data})=>{if(alive){setComparisonTest((data?.[0] as MatchTest)||null);setComparisonLoading(false);}})
+      .catch(()=>{if(alive)setComparisonLoading(false)});
+    return ()=>{alive=false};
+  },[session?.user.id]);
+  const comparisonProfile = {interests:profile.interests,skills:{...profile.skills}};
+  const comparableCareers = CAREER_DATABASE.map(c=>({id:c.id,title:c.titleKey,category:c.category,description:c.descriptionKey,requiredSkills:c.requiredSkills as Record<string,number>,associatedInterests:c.associatedInterests}));
+  const comparisonReady = hasMatchingData(comparisonProfile);
+  const comparisonRanks = comparisonLoading ? [] : rankCareers(comparableCareers,comparisonProfile,comparisonTest);
+  const [autoSaveConsent, setAutoSaveConsent] = useState(false);
+  const [assessmentValidationNotice, setAssessmentValidationNotice] = useState('');
+  const [profileSyncStatus, setProfileSyncStatus] = useState('');
+  const profileFields = [
+    Boolean(profile.name.trim()), profile.age > 0, Boolean(profile.educationLevel),
+    Boolean(profile.university.trim()), Boolean(profile.fieldOfStudy.trim()),
+    profile.interests.length > 0
+  ];
+  const profileCompletion = Math.round(profileFields.filter(Boolean).length / profileFields.length * 100);
+  const profileIsValid = profile.name.trim().length >= 2 && profile.age > 0 &&
+    Boolean(profile.educationLevel) && Boolean(profile.university.trim()) &&
+    Boolean(profile.fieldOfStudy.trim());
+  useEffect(() => {
+    setAutoSaveConsent(false);
+    setProfileSyncStatus('');
+  }, [session?.user.id]);
+  useEffect(() => {
+    if (!autoSaveConsent || !session || !profileIsValid ||
+        localDataOwner !== session.user.id || !authReady) return;
+    const currentUser = session.user.id;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        const { data: { user }, error: authError } = await requireSupabase().auth.getUser();
+        if (authError || !user || user.id !== currentUser) return;
+        const { error } = await requireSupabase().from('profiles').upsert({
+          user_id: currentUser, display_name: profile.name.trim(),
+          profile_data: profile, updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' });
+        setProfileSyncStatus(error ? 'Avtomatik saqlashda xatolik: ' + error.message : 'Profil avtomatik saqlandi');
+      })().catch(() => setProfileSyncStatus('Avtomatik saqlashda xatolik'));
+    }, 1600);
+    return () => window.clearTimeout(timer);
+  }, [profile, autoSaveConsent, session?.user.id, profileIsValid, authReady, localDataOwner]);
+
+  const saveProfileToCloud = async () => {
+    if (!session) throw new Error('Avval tizimga kiring');
+    if (!profileIsValid) throw new Error('Ism, yosh, ta’lim darajasi, ta’lim muassasasi va yo‘nalishni to‘ldiring');
+    const { error } = await requireSupabase().from('profiles').upsert({
+      user_id: session.user.id, display_name: profile.name, profile_data: profile,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'user_id' });
+    if (error) throw error;
+  };
+  const loadProfileFromCloud = async () => {
+    if (!session) throw new Error('Avval tizimga kiring');
+    const { data, error } = await requireSupabase().from('profiles')
+      .select('profile_data').eq('user_id', session.user.id).maybeSingle();
+    if (error) throw error;
+    if (!data) throw new Error('Bulutda profil hali yo‘q');
+    // Keep the local profile intact if the stored record is malformed.
+    const incoming = data.profile_data;
+    if (!incoming || typeof incoming !== 'object' || Array.isArray(incoming)
+      || typeof incoming.name !== 'string' || !incoming.skills
+      || !incoming.personality || !incoming.preferences) throw new Error('Bulutdagi profil noto‘g‘ri');
+    setProfile(incoming as unknown as UserProfile);
+  };
 
   // Save updates to LocalStorage safely
   useEffect(() => {
@@ -1344,21 +1439,31 @@ export default function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem('careermind_profile', JSON.stringify(profile));
+      if (authReady && session && localDataOwner === session.user.id) localStorage.setItem('careermind_profile_' + localDataOwner, JSON.stringify(profile));
     } catch (e) {
       console.error(e);
     }
-  }, [profile]);
+  }, [profile, session?.user.id, authReady, localDataOwner]);
 
   useEffect(() => {
     try {
-      localStorage.setItem('careermind_chat', JSON.stringify(chatMessages));
+      if (authReady && session && localDataOwner === session.user.id) localStorage.setItem('careermind_chat_' + localDataOwner, JSON.stringify(chatMessages));
     } catch (e) {
       console.error(e);
     }
-  }, [chatMessages]);
+  }, [chatMessages, session?.user.id, authReady, localDataOwner]);
 
   const t = TRANSLATIONS[lang];
+  const additionalLang = {"direction":["Yo'nalish: ","Направление: ","Career: "],"unratedInfo":["Ko‘nikma hali baholanmagan bo‘lsa, 0 yoki 1 ball deb hisoblanmaydi. Profil yoki test orqali baholang.","Если навык не оценён, он не считается равным 0 или 1. Оцените его в профиле или тесте.","Unrated skills are not treated as 0 or 1. Rate them in your profile or assessment."],"sampleWarning":["Kasb yo‘nalishlari katalogi. Quyidagi maosh, masofaviy ish va o‘sish raqamlari tasdiqlanmagan namuna qiymatlar; qaror qabul qilish uchun ularga tayanmang.","Каталог профессий. Зарплаты, удалённая работа и темпы роста не проверены; не основывайте на них решения.","Career directory. Salary, remote-work and growth figures are unverified examples; do not rely on them when making decisions."],"catalogButton":["Career Matching 3.0 — aqlli tavsiyalar","Career Matching 3.1 — рекомендации","Career Matching 3.1 — recommendations"],"details":["Batafsil ko‘rish","Подробнее","View details"],"newTest":["Yangi: Assessment 3.0 — 30 savolni boshlash","Новое: Assessment 3.0 — начать 30 вопросов","New: Assessment 3.0 — start 30 questions"],"adaptiveTest":["Adaptive Assessment 3.1 ni boshlash","Начать Adaptive Assessment 3.1","Start Adaptive Assessment 3.1"],"complete":["yakunlandi","завершено","completed"],"validation":["Davom etish uchun ism-familiya, yosh, ta’lim darajasi, ta’lim muassasasi va yo‘nalishni to‘ldiring.","Для продолжения заполните имя, возраст, уровень образования, учебное заведение и специальность.","To continue, enter your name, age, education level, institution, and field of study."]};
+  const lx=(key:keyof typeof additionalLang)=>additionalLang[key][lang==='uz'?0:lang==='ru'?1:2];
+  const extraI18n = {"settingsSubtitle":["Tizim parametrlari va ma'lumotlar boshqaruvi.","Управление настройками и данными.","Manage settings and stored data."],"retakeSubtitle":["Yangi ma'lumotlar bilan qayta test topshirish.","Пройти тест повторно с новыми данными.","Retake the assessment with updated information."],"start":["Testni boshlash","Начать тест","Start assessment"],"clearSubtitle":["Barcha saqlangan progress va xabarlarni tozalash.","Очистить сохранённый локальный прогресс и сообщения.","Clear locally saved progress and messages."],"delete":["O'chirish","Очистить","Clear"],"compareWarning":["Maosh, talab, masofaviy ish va o‘sish ko‘rsatkichlari tasdiqlanmagan namuna qiymatlar — real bozor statistikasi emas.","Данные о зарплате, спросе, удалённой работе и росте не подтверждены и не являются рыночной статистикой.","Salary, demand, remote-work and growth data are unverified examples, not actual market statistics."],"loading":["Oxirgi test yuklanmoqda…","Загружается последний тест…","Loading latest assessment…"],"included":[" hisobga olindi (45% ko‘nikma + 25% qiziqish + 30% test)."," учтён (45% навыки + 25% интересы + 30% тест)."," included (45% skills + 25% interests + 30% assessment)."],"noTest":["Test saqlanmagan: 65% ko‘nikma + 35% qiziqish.","Нет сохранённого теста: 65% навыки + 35% интересы.","No saved assessment: 65% skills + 35% interests."],"needsData":["Moslik uchun kamida 3 ta baholangan ko‘nikma va 1 ta qiziqish zarur.","Для расчёта нужны не менее 3 оценённых навыков и 1 интерес.","A match requires at least 3 rated skills and 1 interest."],"fit":["Moslik ko'rsatkichi","Соответствие","Career fit"],"unrated":["Baholanmagan","Не оценено","Not assessed"],"awaiting":["Manba kutilmoqda","Источник не указан","Source pending"],"support":["Yordam","Помощь","Help"]};
+  const tx=(key: keyof typeof extraI18n)=>extraI18n[key][lang==='uz'?0:lang==='ru'?1:2];
+
+  // Require substantive profile input before displaying fit estimates.
+  const hasCareerAssessment = Object.values(profile.skills).filter(v => v > 0).length >= 3
+    && Object.values(profile.personality).filter(v => v > 0).length >= 3
+    && profile.interests.length > 0 && Boolean(profile.careerGoal);
+  const displayMatch = (score: number) => hasCareerAssessment ? score + '%' : 'Baholanmagan';
 
   // Calculated Matches
   const careerScores = useMemo(() => {
@@ -1367,7 +1472,7 @@ export default function App() {
 
   const bestMatch = careerScores[0] || {
     career: CAREER_DATABASE[0],
-    matchScore: 90,
+    matchScore: 0,
     strengths: ['programming', 'problemSolving'],
     missingSkills: ['mathematics']
   };
@@ -1381,30 +1486,8 @@ export default function App() {
   }, [inspectedCareerId, selectedCareer]);
 
   // Gamification helpers
-  const handleToggleTask = (taskId: string) => {
-    const isCompleted = !!profile.completedTasks[taskId];
-    const newTasks = { ...profile.completedTasks, [taskId]: !isCompleted };
-    const xpChange = !isCompleted ? 50 : -50;
-    const newXp = Math.max(0, profile.xp + xpChange);
-
-    let updatedBadges = [...profile.unlockedBadges];
-    if (Object.values(newTasks).filter(Boolean).length >= 5 && !updatedBadges.includes('task_master')) {
-      updatedBadges.push('task_master');
-    }
-
-    setProfile(prev => ({
-      ...prev,
-      completedTasks: newTasks,
-      xp: newXp,
-      unlockedBadges: updatedBadges
-    }));
-  };
-
-  const calculateLevel = (xp: number) => {
-    return Math.floor(xp / 200) + 1;
-  };
-
-  const handleSendMessage = (textToSend?: string) => {
+  const handleSendMessage = async (textToSend?: string) => {
+    if (isAiTyping) return;
     const query = textToSend || chatInput;
     if (!query.trim()) return;
 
@@ -1419,6 +1502,26 @@ export default function App() {
     if (!textToSend) setChatInput('');
     setIsAiTyping(true);
 
+    if (session) {
+      try {
+        const context = JSON.stringify({ language: lang, career: selectedCareer.titleKey, skillsToImprove: bestMatch.missingSkills });
+        const result = await askCareerAI(query, session.access_token, context);
+        setChatMessages(prev => [...prev, {
+          id: `ai-${Date.now()}`, sender: 'ai', text: result.reply,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }]);
+      } catch {
+        setChatMessages(prev => [...prev, {
+          id: `error-${Date.now()}`, sender: 'ai',
+          text: "AI xizmatiga ulanib bo‘lmadi. Hisobingiz yoki server sozlamalarini tekshiring. Savolni qayta yuborishingiz mumkin.",
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }]);
+      } finally {
+        setIsAiTyping(false);
+      }
+      return;
+    }
+    // Guest mode: local keyword-based suggestions, not an AI model.
     // Realistic smart response generator based on user's exact profile and query
     setTimeout(() => {
       let replyText = "";
@@ -1428,7 +1531,7 @@ export default function App() {
 
       if (lang === 'uz') {
         if (lower.includes('mos') || lower.includes('qaysi kasb') || lower.includes('tavsiya')) {
-          replyText = `Sizning javoblaringiz tahlili bo'yicha sizga eng mos kasb — **${topCareer}** (${bestMatch.matchScore}% moslik). Kuchli tomonlaringiz: ${bestMatch.strengths.join(', ')}. Ushbu yo'nalish sizning ${profile.preferences.workType} formatidagi ishlash xohishingizga to'liq javob beradi.`;
+          replyText = `Sizning javoblaringiz tahlili bo'yicha sizga eng mos kasb — **${topCareer}** (${displayMatch(bestMatch.matchScore)} moslik). Kuchli tomonlaringiz: ${bestMatch.strengths.join(', ')}. Ushbu yo'nalish sizning ${profile.preferences.workType} formatidagi ishlash xohishingizga to'liq javob beradi.`;
         } else if (lower.includes('nimani') || lower.includes("o'rganish") || lower.includes('oy')) {
           replyText = `Rejangiz bo'yicha 1-oyda asosiy e'tiborni **${selectedCareer.roadmapMonths[0]?.title}**ga qaratish lozim. Hozirda sizda ${bestMatch.missingSkills.join(' va ')} bo'yicha bilimlarni kuchaytirish ustuvor vazifadir. Kuniga 45 daqiqa ajratib, yo'l xaritasidagi 1-vazifani bajaring!`;
         } else if (lower.includes('masofaviy') || lower.includes('remote') || lower.includes('dollar') || lower.includes('maosh')) {
@@ -1440,7 +1543,7 @@ export default function App() {
         }
       } else if (lang === 'ru') {
         if (lower.includes('подходит') || lower.includes('профессия') || lower.includes('лучше')) {
-          replyText = `Исходя из вашего профиля, наилучшая совместимость у специальности **${topCareer}** (${bestMatch.matchScore}%). Ваши ключевые преимущества: ${bestMatch.strengths.join(', ')}. Это полностью отвечает вашей цели: ${profile.careerGoal}.`;
+          replyText = `Исходя из вашего профиля, наилучшая совместимость у специальности **${topCareer}** (${displayMatch(bestMatch.matchScore)}). Ваши ключевые преимущества: ${bestMatch.strengths.join(', ')}. Это полностью отвечает вашей цели: ${profile.careerGoal}.`;
         } else if (lower.includes('учить') || lower.includes('навыки') || lower.includes('месяц')) {
           replyText = `Вам рекомендуется сфокусироваться на первом месяце роадмапа: **${selectedCareer.roadmapMonths[0]?.title}**. Главная зона роста сейчас — ${bestMatch.missingSkills.join(', ')}. Выполняйте интерактивные чек-листы в разделе "План обучения".`;
         } else if (lower.includes('удален') || lower.includes('зарплат') || lower.includes('remote')) {
@@ -1450,7 +1553,7 @@ export default function App() {
         }
       } else {
         if (lower.includes('best') || lower.includes('fit') || lower.includes('career')) {
-          replyText = `Based on your diagnostic profile, your top career match is **${topCareer}** at **${bestMatch.matchScore}% compatibility**. Your strongest pillars are ${bestMatch.strengths.join(', ')}.`;
+          replyText = `Based on your diagnostic profile, your top career match is **${topCareer}** at **${displayMatch(bestMatch.matchScore)} compatibility**. Your strongest pillars are ${bestMatch.strengths.join(', ')}.`;
         } else if (lower.includes('learn') || lower.includes('month') || lower.includes('first')) {
           replyText = `For Month 1, prioritize: **${selectedCareer.roadmapMonths[0]?.title}**. You should primarily bridge the gap in ${bestMatch.missingSkills.join(' and ')}. Check out the tasks in your Learning Roadmap!`;
         } else if (lower.includes('remote') || lower.includes('salary') || lower.includes('earn')) {
@@ -1472,65 +1575,38 @@ export default function App() {
     }, 850);
   };
 
+  const activeSection = ({
+    dashboardV2: 'dashboard', assessmentV3: 'assessment', adaptiveAssessment: 'assessment',
+    careerMatchingV3: 'careers', myCareer: 'careers',
+    smartRoadmap: 'roadmap'
+  } as Record<string, string>)[activeTab] || activeTab;
+  const navigateTo = (tab: string) => {
+    setActiveTab(tab);
+    setMobileMenuOpen(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const renderNavbar = () => (
     <header className="sticky top-0 z-50 backdrop-blur-xl bg-slate-950/80 border-b border-slate-800/80 transition-all">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2">
         {/* Brand */}
         <div 
-          onClick={() => setActiveTab('home')}
-          className="flex items-center space-x-3 cursor-pointer group select-none"
+          onClick={() => navigateTo('home')}
+          className="flex min-w-0 shrink items-center gap-2 sm:gap-3 cursor-pointer group select-none"
         >
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-cyan-400 p-0.5 shadow-lg shadow-indigo-500/20 group-hover:shadow-indigo-500/40 transition">
-            <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
-              <BrainCircuit className="w-5 h-5 text-cyan-400 group-hover:scale-110 transition duration-300" />
-            </div>
-          </div>
+          <img src="/favicon.svg" alt="CareerMind AI logotipi" className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-xl group-hover:scale-105 transition duration-300" />
           <div>
-            <span className="font-extrabold text-xl tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+            <span className="font-extrabold text-sm sm:text-xl tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
               CareerMind <span className="text-cyan-400 font-mono">AI</span>
             </span>
-            <div className="text-[10px] text-slate-400 tracking-wider uppercase font-semibold">
+            <div className="hidden sm:block text-[10px] text-slate-400 tracking-wider uppercase font-semibold">
               Guidance System
             </div>
           </div>
         </div>
 
-        {/* Desktop Navigation */}
-        <nav className="hidden xl:flex items-center space-x-1">
-          {[
-            { id: 'home', label: t.home, icon: Compass },
-            { id: 'dashboard', label: t.dashboard, icon: BarChart3 },
-            { id: 'assessment', label: t.assessment, icon: Sliders },
-            { id: 'careers', label: t.careers, icon: Briefcase },
-            { id: 'skillGap', label: t.skillGap, icon: Target },
-            { id: 'roadmap', label: t.roadmap, icon: BookOpen },
-            { id: 'compare', label: t.compare, icon: Scale },
-            { id: 'assistant', label: t.aiAssistant, icon: Bot }
-          ].map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  setActiveTab(item.id);
-                  if (item.id === 'myCareer') setInspectedCareerId(profile.selectedCareerId || 'ai-engineer');
-                }}
-                className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
-                  isActive
-                    ? 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-cyan-300 border border-indigo-500/40 shadow-sm'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
-                }`}
-              >
-                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-cyan-400' : 'text-slate-400'}`} />
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-
         {/* Status Badges, Lang Switcher & Mobile Menu Trigger */}
-        <div className="flex items-center space-x-3">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           {/* XP & Streak */}
           <div className="hidden sm:flex items-center space-x-2 bg-slate-900/90 border border-slate-800 rounded-full px-3 py-1 text-xs">
             <div className="flex items-center space-x-1 text-amber-400 font-semibold">
@@ -1545,12 +1621,12 @@ export default function App() {
           </div>
 
           {/* Lang Selector */}
-          <div className="relative flex items-center bg-slate-900 border border-slate-800 rounded-lg p-0.5 text-xs">
+          <div className="relative flex items-center shrink-0 bg-slate-900 border border-slate-800 rounded-lg p-0.5 text-xs">
             {(['uz', 'ru', 'en'] as Language[]).map((l) => (
               <button
                 key={l}
                 onClick={() => setLang(l)}
-                className={`px-2 py-1 rounded font-semibold uppercase transition ${
+                className={`px-1.5 sm:px-2 py-1 rounded font-semibold uppercase transition ${
                   lang === l
                     ? 'bg-indigo-600 text-white shadow-sm'
                     : 'text-slate-400 hover:text-slate-200'
@@ -1561,10 +1637,13 @@ export default function App() {
             ))}
           </div>
 
+          <button onClick={() => navigateTo('support')}
+            className={`hidden sm:inline-flex px-3 py-2 rounded-lg text-xs border ${activeTab === 'support' ? 'bg-indigo-600/30 border-indigo-500 text-cyan-300' : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white'}`}
+            title={tx('support')}>{tx('support')}</button>
           {/* User Profile / Settings */}
           <button
-            onClick={() => setActiveTab('profile')}
-            className={`p-2 rounded-lg border transition ${
+            onClick={() => navigateTo('profile')}
+            className={`hidden sm:inline-flex p-2 rounded-lg border transition ${
               activeTab === 'profile'
                 ? 'bg-indigo-600/30 border-indigo-500 text-cyan-300'
                 : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white'
@@ -1575,7 +1654,7 @@ export default function App() {
           </button>
 
           <button
-            onClick={() => setActiveTab('settings')}
+            onClick={() => navigateTo('settings')}
             className={`p-2 rounded-lg border transition ${
               activeTab === 'settings'
                 ? 'bg-indigo-600/30 border-indigo-500 text-cyan-300'
@@ -1588,17 +1667,58 @@ export default function App() {
 
           {/* Mobile Menu Button */}
           <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="xl:hidden p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-300"
+            onClick={() => setMobileMenuOpen(open => !open)}
+            aria-label={mobileMenuOpen ? 'Menyuni yopish' : 'Menyuni ochish'}
+            aria-expanded={mobileMenuOpen}
+            aria-controls="careermind-mobile-nav"
+            className="xl:hidden shrink-0 p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-300"
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
       </div>
 
+      <div className="hidden xl:block border-t border-slate-800/70 bg-slate-950/70">
+        {/* Desktop Navigation */}
+        <nav aria-label="Asosiy navigatsiya" className="hidden xl:flex max-w-7xl mx-auto items-center justify-center gap-2 px-4 py-2">
+          {[
+            { id: 'home', label: t.home, icon: Compass },
+            { id: 'dashboard', label: t.dashboard, icon: BarChart3 },
+            { id: 'assessment', label: t.assessment, icon: Sliders },
+            { id: 'careers', label: t.careers, icon: Briefcase },
+            { id: 'skillGap', label: t.skillGap, icon: Target },
+            { id: 'roadmap', label: t.roadmap, icon: BookOpen },
+            { id: 'compare', label: t.compare, icon: Scale },
+            { id: 'assistant', label: t.aiAssistant, icon: Bot }
+          ].map((item) => {
+            const Icon = item.icon;
+            const isActive = activeSection === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => {
+                  navigateTo(item.id);
+                  if (item.id === 'myCareer') setInspectedCareerId(profile.selectedCareerId || 'ai-engineer');
+                }}
+                aria-current={isActive ? 'page' : undefined}
+                className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                  isActive
+                    ? 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-cyan-300 border border-indigo-500/40 shadow-sm'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
+                <Icon className={`w-4 h-4 ${isActive ? 'text-cyan-400' : 'text-slate-400'}`} />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+
+      </div>
+
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="xl:hidden bg-slate-950/95 border-b border-slate-800 px-4 pt-2 pb-6 space-y-2 backdrop-blur-2xl">
+        <div id="careermind-mobile-nav" role="navigation" aria-label="Mobil navigatsiya" className="xl:hidden max-h-[calc(100dvh-4rem)] overflow-y-auto bg-slate-950/95 border-b border-slate-800 px-4 pt-2 pb-6 space-y-2 backdrop-blur-2xl">
           {[
             { id: 'home', label: t.home, icon: Compass },
             { id: 'dashboard', label: t.dashboard, icon: BarChart3 },
@@ -1609,17 +1729,18 @@ export default function App() {
             { id: 'compare', label: t.compare, icon: Scale },
             { id: 'assistant', label: t.aiAssistant, icon: Bot },
             { id: 'profile', label: t.profile, icon: User },
+            { id: 'support', label: 'Qo‘llab-quvvatlash', icon: BookOpen },
             { id: 'settings', label: t.settings, icon: SettingsIcon }
           ].map((item) => {
             const Icon = item.icon;
-            const isActive = activeTab === item.id;
+            const isActive = activeSection === item.id;
             return (
               <button
                 key={item.id}
                 onClick={() => {
-                  setActiveTab(item.id);
-                  setMobileMenuOpen(false);
+                  navigateTo(item.id);
                 }}
+                aria-current={isActive ? 'page' : undefined}
                 className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium ${
                   isActive
                     ? 'bg-indigo-600/30 text-cyan-300 border border-indigo-500/40'
@@ -1678,10 +1799,10 @@ export default function App() {
         {/* Trust Badges & Numbers */}
         <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto text-left">
           {[
-            { val: "94.8%", label: "Accuracy Rating", sub: "Algorithm satisfaction" },
-            { val: "8+", label: "In-Depth Fields", sub: "Tech & Product tracks" },
-            { val: "6-Month", label: "Structured Roadmaps", sub: "Milestone-driven" },
-            { val: "100%", label: "Explainable Match", sub: "Multi-factor formula" }
+            { val: "30", label: "Test savollari", sub: "Assessment 3.0" },
+            { val: "5", label: "Ko‘nikma yo‘nalishi", sub: "Boshlang‘ich baholash" },
+            { val: "3–6 oy", label: "Shaxsiy o‘quv rejasi", sub: "Haftalik topshiriqlar" },
+            { val: "Top 5", label: "Kasb tavsiyalari", sub: "Izohli taxminiy moslik" }
           ].map((stat, i) => (
             <div key={i} className="p-4 rounded-xl bg-slate-900/40 border border-slate-800/80 backdrop-blur-sm">
               <div className="text-2xl font-black text-white">{stat.val}</div>
@@ -1875,6 +1996,11 @@ export default function App() {
 
   const renderAssessment = () => {
     const handleNext = () => {
+      if (assessmentStep === 1 && !profileIsValid) {
+        setAssessmentValidationNotice(lx('validation'));
+        return;
+      }
+      setAssessmentValidationNotice('');
       if (assessmentStep < 6) {
         setAssessmentStep(assessmentStep + 1);
       } else {
@@ -1899,13 +2025,14 @@ export default function App() {
 
     return (
       <div className="max-w-4xl mx-auto px-4 py-8">
+        {assessmentValidationNotice && <p role="alert" className="mb-4 text-sm text-amber-300">{assessmentValidationNotice}</p>}
         {/* Progress Bar & Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
             <span className="font-semibold text-cyan-400">
               {t.step} {assessmentStep} {t.of} 6
             </span>
-            <span>{Math.round((assessmentStep / 6) * 100)}% yakunlandi</span>
+            <span>{Math.round((assessmentStep / 6) * 100)}% {lx('complete')}</span>
           </div>
           <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
             <div
@@ -1939,7 +2066,7 @@ export default function App() {
                   <label className="block text-xs font-semibold text-slate-300 mb-1">Yosh</label>
                   <input
                     type="number"
-                    value={profile.age}
+                    value={profile.age || ''}
                     onChange={(e) => setProfile({ ...profile, age: Number(e.target.value) })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
                   />
@@ -1954,6 +2081,7 @@ export default function App() {
                     onChange={(e) => setProfile({ ...profile, educationLevel: e.target.value as EducationLevel })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
                   >
+                    <option value="" disabled>Ta’lim darajasini tanlang</option>
                     <option value="high_school">Maktab / Kollej / Litsey</option>
                     <option value="bachelor">Bakalavr talabasi / Bitiruvchi</option>
                     <option value="master">Magistratura</option>
@@ -1990,7 +2118,7 @@ export default function App() {
                     type="number"
                     min="0"
                     max="30"
-                    value={profile.yearsOfExperience}
+                    value={profile.yearsOfExperience || ''}
                     onChange={(e) => setProfile({ ...profile, yearsOfExperience: Number(e.target.value) })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
                   />
@@ -2282,6 +2410,8 @@ export default function App() {
             </div>
           )}
 
+          {assessmentStep === 6 && <Suspense fallback={<p role="status" className="px-4 py-6 text-slate-300">Sahifa yuklanmoqda…</p>}><ObjectiveAssessment session={session} /></Suspense>}
+
           {/* Navigation Buttons */}
           <div className="mt-8 pt-6 border-t border-slate-800/80 flex items-center justify-between">
             <button
@@ -2310,254 +2440,6 @@ export default function App() {
     );
   };
 
-  const renderDashboard = () => {
-    const activeCareer = selectedCareer;
-    const completedTasksCount = Object.values(profile.completedTasks).filter(Boolean).length;
-    const totalRoadmapTasks = activeCareer.roadmapMonths.reduce((acc, m) => acc + m.tasks.length, 0);
-    const progressPercent = totalRoadmapTasks > 0 ? Math.round((completedTasksCount / totalRoadmapTasks) * 100) : 0;
-
-    return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        {/* Welcome Banner */}
-        <div className="relative p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-indigo-950/80 via-slate-900 to-slate-950 border border-indigo-900/40 overflow-hidden shadow-xl">
-          <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-            <div>
-              <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-500/20 text-cyan-300 border border-indigo-500/30 text-xs font-semibold mb-3">
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>AI Karyera holati tahlil qilindi</span>
-              </div>
-              <h2 className="text-2xl sm:text-3xl font-black text-white">
-                {t.welcome}, {profile.name || 'Foydalanuvchi'} 👋
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-xl">
-                Sizning eng yuqori moslikdagi yo'nalishingiz: <span className="font-bold text-cyan-300">{bestMatch.career.titleKey}</span>. 
-                O'quv rejasida qolgan vazifalarni bajarishda davom eting!
-              </p>
-            </div>
-
-            <div className="flex items-center gap-4 bg-slate-900/80 border border-slate-800 p-4 rounded-2xl">
-              <div className="text-center px-2">
-                <div className="text-2xl font-black text-cyan-400">{bestMatch.matchScore}%</div>
-                <div className="text-[11px] text-slate-400 font-semibold">{t.matchScore}</div>
-              </div>
-              <div className="w-px h-10 bg-slate-800" />
-              <div className="text-center px-2">
-                <div className="text-2xl font-black text-purple-400">Lv.{calculateLevel(profile.xp)}</div>
-                <div className="text-[11px] text-slate-400 font-semibold">{profile.xp} XP</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Top 3 Career Matches */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-white flex items-center space-x-2">
-              <Compass className="w-5 h-5 text-indigo-400" />
-              <span>Eng mos keladigan 3 ta kasb</span>
-            </h3>
-            <button
-              onClick={() => setActiveTab('careers')}
-              className="text-xs font-semibold text-cyan-400 hover:text-cyan-300"
-            >
-              Hammasini ko'rish →
-            </button>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-5">
-            {careerScores.slice(0, 3).map((item, idx) => {
-              const isSelected = profile.selectedCareerId === item.career.id;
-              return (
-                <div
-                  key={item.career.id}
-                  className={`p-5 rounded-2xl border transition-all duration-200 relative flex flex-col justify-between ${
-                    isSelected
-                      ? 'bg-slate-900/90 border-cyan-400/80 shadow-lg shadow-cyan-950/50'
-                      : 'bg-slate-900/50 border-slate-800/80 hover:border-slate-700'
-                  }`}
-                >
-                  {isSelected && (
-                    <div className="absolute -top-3 right-4 px-2.5 py-0.5 bg-cyan-500 text-slate-950 text-[10px] font-black rounded-full uppercase tracking-wider">
-                      Tanlangan yo'nalish
-                    </div>
-                  )}
-
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">
-                        Rank #{idx + 1}
-                      </span>
-                      <span className="text-sm font-black text-cyan-300">{item.matchScore}% moslik</span>
-                    </div>
-
-                    <h4 className="text-base font-bold text-white mt-1.5">{item.career.titleKey}</h4>
-                    <p className="text-xs text-slate-400 mt-2 line-clamp-2 leading-relaxed">
-                      {item.career.descriptionKey}
-                    </p>
-
-                    <div className="mt-4 pt-3 border-t border-slate-800/60 space-y-1.5 text-xs">
-                      <div className="flex justify-between text-slate-300">
-                        <span className="text-slate-500">Maosh:</span>
-                        <span className="font-semibold">{item.career.baseSalary}</span>
-                      </div>
-                      <div className="flex justify-between text-slate-300">
-                        <span className="text-slate-500">Talab:</span>
-                        <span className="font-semibold text-emerald-400">{item.career.demand}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 pt-3 border-t border-slate-800 flex gap-2">
-                    <button
-                      onClick={() => {
-                        setInspectedCareerId(item.career.id);
-                        setActiveTab('myCareer');
-                      }}
-                      className="flex-1 py-2 text-center rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 transition"
-                    >
-                      Batafsil
-                    </button>
-                    {!isSelected && (
-                      <button
-                        onClick={() => {
-                          setProfile(prev => ({ ...prev, selectedCareerId: item.career.id }));
-                        }}
-                        className="px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white transition"
-                      >
-                        Tanlash
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Roadmap Progress & Daily Focus */}
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Active Roadmap Progress */}
-          <div className="lg:col-span-2 p-6 rounded-2xl bg-slate-900/60 border border-slate-800/80">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h4 className="text-base font-bold text-white flex items-center space-x-2">
-                  <BookOpen className="w-4 h-4 text-cyan-400" />
-                  <span>Aktiv Yo'l Xaritasi: {activeCareer.titleKey}</span>
-                </h4>
-                <p className="text-xs text-slate-400 mt-0.5">Vazifalarni bajarib, tajribangizni oshiring.</p>
-              </div>
-              <div className="text-right">
-                <span className="text-xs font-bold text-cyan-400">{progressPercent}%</span>
-                <span className="text-[10px] text-slate-500 block">bajarildi</span>
-              </div>
-            </div>
-
-            {/* Overall Bar */}
-            <div className="w-full h-2.5 bg-slate-950 rounded-full border border-slate-800 overflow-hidden mb-6">
-              <div
-                className="h-full bg-gradient-to-r from-indigo-500 to-cyan-400 transition-all duration-300"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
-
-            {/* Immediate Next Tasks */}
-            <div className="space-y-3">
-              <h5 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Navbatdagi amaliy vazifalar:</h5>
-              {activeCareer.roadmapMonths[0].tasks.map((task) => {
-                const isDone = !!profile.completedTasks[task.id];
-                return (
-                  <div
-                    key={task.id}
-                    onClick={() => handleToggleTask(task.id)}
-                    className={`p-3.5 rounded-xl border flex items-center justify-between cursor-pointer transition ${
-                      isDone
-                        ? 'bg-slate-950/40 border-slate-800/60 text-slate-500'
-                        : 'bg-slate-950 border-slate-800 text-slate-200 hover:border-slate-700'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-3">
-                      {isDone ? (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                      ) : (
-                        <Circle className="w-4 h-4 text-slate-600 flex-shrink-0" />
-                      )}
-                      <div>
-                        <span className={`text-xs font-semibold ${isDone ? 'line-through' : ''}`}>
-                          {task.name}
-                        </span>
-                        <span className="block text-[10px] text-cyan-500">{task.resource}</span>
-                      </div>
-                    </div>
-                    <span className="text-[10px] font-bold text-amber-400/90">+50 XP</span>
-                  </div>
-                );
-              })}
-            </div>
-
-            <button
-              onClick={() => setActiveTab('roadmap')}
-              className="mt-6 w-full py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-xs font-semibold text-cyan-300 transition"
-            >
-              To'liq 6 oylik rejani ko'rish →
-            </button>
-          </div>
-
-          {/* Gamification & Badges */}
-          <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800/80 flex flex-col justify-between">
-            <div>
-              <h4 className="text-base font-bold text-white flex items-center space-x-2 mb-4">
-                <Award className="w-4 h-4 text-amber-400" />
-                <span>{t.achievements}</span>
-              </h4>
-
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { id: 'first_assessment', title: 'Birinchi test', desc: "Testni yakunladi", icon: Sparkles },
-                  { id: 'streak_starter', title: 'Faol foydalanuvchi', desc: "Doimiy tashrif", icon: Flame },
-                  { id: 'task_master', title: 'Vazifalar ustasi', desc: "5+ vazifa bajarildi", icon: CheckCircle2 },
-                  { id: 'ai_explorer', title: 'AI Karyerachi', desc: "Suhbatdan o'tdi", icon: Bot }
-                ].map((badge) => {
-                  const Icon = badge.icon;
-                  const isUnlocked = profile.unlockedBadges.includes(badge.id);
-                  return (
-                    <div
-                      key={badge.id}
-                      className={`p-3 rounded-xl border text-center flex flex-col items-center justify-center ${
-                        isUnlocked
-                          ? 'bg-slate-950 border-amber-500/40 text-amber-300'
-                          : 'bg-slate-950/40 border-slate-800/60 text-slate-600 opacity-60'
-                      }`}
-                    >
-                      <Icon className="w-5 h-5 mb-1.5" />
-                      <div className="text-[11px] font-bold leading-tight">{badge.title}</div>
-                      <div className="text-[9px] text-slate-400 mt-0.5">{badge.desc}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="mt-6 pt-4 border-t border-slate-800/80">
-              <div className="flex justify-between text-xs text-slate-400 mb-1">
-                <span>Keyingi darajagacha:</span>
-                <span className="text-cyan-400 font-bold">{200 - (profile.xp % 200)} XP</span>
-              </div>
-              <div className="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-cyan-400"
-                  style={{ width: `${(profile.xp % 200) / 2}%` }}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All');
-
   const renderCareerDirectory = () => {
     const categories = ['All', 'AI & Machine Learning', 'Data Science', 'Software Development', 'Cybersecurity', 'Design', 'Business', 'Robotics'];
 
@@ -2572,7 +2454,7 @@ export default function App() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         <div>
           <h2 className="text-2xl font-black text-white">{t.careers}</h2>
-          <p className="text-xs text-slate-400 mt-1">Bozorda yuqori talabga ega bo'lgan zamonaviy yo'nalishlar katalogi.</p>
+          <p className="text-xs text-slate-400 mt-1">{lx('sampleWarning')}</p>
         </div>
 
         {/* Filter & Search Bar */}
@@ -2609,7 +2491,7 @@ export default function App() {
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filtered.map((career) => {
             const scoreObj = careerScores.find(cs => cs.career.id === career.id);
-            const score = scoreObj ? scoreObj.matchScore : 75;
+            const score = scoreObj ? scoreObj.matchScore : 0;
 
             return (
               <div
@@ -2622,7 +2504,7 @@ export default function App() {
                       {career.category}
                     </span>
                     <span className="text-xs font-black text-cyan-300 px-2 py-0.5 rounded bg-cyan-950/60 border border-cyan-800/40">
-                      {score}% {t.matchScore}
+                      {displayMatch(score)} {t.matchScore}
                     </span>
                   </div>
 
@@ -2637,15 +2519,15 @@ export default function App() {
                   <div className="mt-5 space-y-2 text-xs">
                     <div className="flex justify-between text-slate-300">
                       <span className="text-slate-500">{t.salaryRange}:</span>
-                      <span className="font-semibold text-white">{career.baseSalary}</span>
+                      <span className="font-semibold text-white">Manba kutilmoqda</span>
                     </div>
                     <div className="flex justify-between text-slate-300">
                       <span className="text-slate-500">{t.remotePotential}:</span>
-                      <span className="font-semibold text-cyan-400">{career.remoteScore}%</span>
+                      <span className="font-semibold text-cyan-400">Manba kutilmoqda</span>
                     </div>
                     <div className="flex justify-between text-slate-300">
                       <span className="text-slate-500">{t.growthForecast}:</span>
-                      <span className="font-semibold text-emerald-400">{career.growthRate}</span>
+                      <span className="font-semibold text-emerald-400">Manba kutilmoqda</span>
                     </div>
                   </div>
                 </div>
@@ -2683,7 +2565,7 @@ export default function App() {
   const renderCareerDetails = () => {
     const career = inspectedCareer;
     const scoreObj = careerScores.find(cs => cs.career.id === career.id);
-    const score = scoreObj ? scoreObj.matchScore : 80;
+    const score = scoreObj ? scoreObj.matchScore : 0;
     const isCurrentActive = profile.selectedCareerId === career.id;
 
     return (
@@ -2700,28 +2582,29 @@ export default function App() {
             </div>
 
             <div className="flex flex-col items-center bg-slate-950 p-4 rounded-2xl border border-slate-800 min-w-[130px]">
-              <span className="text-3xl font-black text-cyan-400">{score}%</span>
+              <span className="text-3xl font-black text-cyan-400">{displayMatch(score)}</span>
               <span className="text-[10px] text-slate-400 font-semibold mt-0.5">{t.matchScore}</span>
             </div>
           </div>
 
+          <p className="mt-5 text-xs text-amber-300">Quyidagi bozor ko‘rsatkichlari manbasi tasdiqlanmagan namunaviy qiymatlar. Haqiqiy maosh va ish bozori ko‘rsatkichlari hudud hamda tajribaga qarab farqlanadi.</p>
           {/* Quick Metrics */}
           <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-4 pt-6 border-t border-slate-800/80 text-xs">
             <div>
               <span className="text-slate-500 block">{t.salaryRange}</span>
-              <span className="font-bold text-white mt-0.5 block">{career.baseSalary}</span>
+              <span className="font-bold text-white mt-0.5 block">Manba kutilmoqda</span>
             </div>
             <div>
               <span className="text-slate-500 block">{t.demandLevel}</span>
-              <span className="font-bold text-emerald-400 mt-0.5 block">{career.demand}</span>
+              <span className="font-bold text-emerald-400 mt-0.5 block">Manba kutilmoqda</span>
             </div>
             <div>
               <span className="text-slate-500 block">{t.remotePotential}</span>
-              <span className="font-bold text-cyan-400 mt-0.5 block">{career.remoteScore}%</span>
+              <span className="font-bold text-cyan-400 mt-0.5 block">Manba kutilmoqda</span>
             </div>
             <div>
               <span className="text-slate-500 block">{t.growthForecast}</span>
-              <span className="font-bold text-purple-400 mt-0.5 block">{career.growthRate}</span>
+              <span className="font-bold text-purple-400 mt-0.5 block">Manba kutilmoqda</span>
             </div>
           </div>
 
@@ -2808,20 +2691,25 @@ export default function App() {
       <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
         <div>
           <h2 className="text-2xl font-black text-white">{t.skillGapTitle}</h2>
-          <p className="text-xs text-slate-400 mt-1">{t.skillGapDesc} (Yo'nalish: <span className="text-cyan-400 font-bold">{career.titleKey}</span>)</p>
+          <p className="text-xs text-slate-400 mt-1">{t.skillGapDesc} ({lx('direction')}<span className="text-cyan-400 font-bold">{career.titleKey}</span>)</p>
         </div>
 
         <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 sm:p-8 backdrop-blur-md space-y-6">
+          <p className="text-xs text-slate-400">{lx('unratedInfo')}</p>
           <div className="grid gap-5">
             {Object.entries(career.requiredSkills).map(([skillKey, requiredVal]) => {
-              const userVal = profile.skills[skillKey as keyof SkillRatings] || 1;
+              const userVal = profile.skills[skillKey as keyof SkillRatings] ?? 0;
+              const isUnrated = userVal <= 0;
               const delta = userVal - (requiredVal || 5);
               const isMedium = delta === -1 || delta === -2;
               const isWeak = delta < -2;
 
               let statusLabel = t.strong;
               let statusColor = "text-emerald-400 bg-emerald-950/60 border-emerald-800/40";
-              if (isMedium) {
+              if (isUnrated) {
+                statusLabel = "Baholanmagan";
+                statusColor = "text-slate-300 bg-slate-800 border-slate-700";
+              } else if (isMedium) {
                 statusLabel = t.medium;
                 statusColor = "text-amber-400 bg-amber-950/60 border-amber-800/40";
               } else if (isWeak) {
@@ -2837,7 +2725,7 @@ export default function App() {
                         {skillKey.replace(/([A-Z])/g, ' $1')}
                       </span>
                       <span className="text-[11px] text-slate-500 ml-2">
-                        (Siz: {userVal}/10 vs Talab: {requiredVal}/10)
+                        (Siz: {isUnrated ? "Baholanmagan" : `${userVal}/10`} vs Talab: {requiredVal}/10)
                       </span>
                     </div>
 
@@ -2852,7 +2740,7 @@ export default function App() {
                     <div>
                       <div className="flex justify-between text-slate-400 mb-0.5">
                         <span>{t.userCurrent}</span>
-                        <span>{userVal * 10}%</span>
+                        <span>{isUnrated ? "Baholanmagan" : `${userVal * 10}%`}</span>
                       </div>
                       <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden">
                         <div
@@ -2878,7 +2766,7 @@ export default function App() {
                   </div>
 
                   {/* Recommendation action */}
-                  {isWeak && (
+                  {isWeak && !isUnrated && (
                     <div className="mt-3 pt-2 text-[11px] text-rose-300 flex items-center space-x-1.5">
                       <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
                       <span>Tavsiya: Ushbu soha bo'yicha amaliy topshiriqlarni yo'l xaritasida 1-o'ringa qo'ying.</span>
@@ -2888,103 +2776,6 @@ export default function App() {
               );
             })}
           </div>
-        </div>
-      </div>
-    );
-  };
-
-  const renderRoadmap = () => {
-    const career = selectedCareer;
-
-    return (
-      <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-black text-white">{t.roadmapTitle}</h2>
-            <p className="text-xs text-slate-400 mt-1">
-              Tanlangan yo'nalish: <span className="text-cyan-400 font-bold">{career.titleKey}</span>
-            </p>
-          </div>
-
-          <button
-            onClick={() => setActiveTab('careers')}
-            className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 self-start sm:self-auto"
-          >
-            Boshqa kasb rejasini ko'rish →
-          </button>
-        </div>
-
-        {/* 6-Month Timeline Cards */}
-        <div className="space-y-6">
-          {career.roadmapMonths.map((month) => {
-            const completedCount = month.tasks.filter(tk => !!profile.completedTasks[tk.id]).length;
-            const isAllCompleted = completedCount === month.tasks.length && month.tasks.length > 0;
-
-            return (
-              <div
-                key={month.month}
-                className={`p-6 rounded-2xl border transition-all ${
-                  isAllCompleted
-                    ? 'bg-slate-900/40 border-emerald-500/40'
-                    : 'bg-slate-900/70 border-slate-800'
-                }`}
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-                  <div className="flex items-center space-x-3">
-                    <span className="w-8 h-8 rounded-lg bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center text-xs font-black text-cyan-300">
-                      M{month.month}
-                    </span>
-                    <div>
-                      <h4 className="text-base font-bold text-white">{month.title}</h4>
-                      <p className="text-xs text-slate-400">{month.focus}</p>
-                    </div>
-                  </div>
-
-                  <span className="text-[11px] font-semibold text-slate-400">
-                    {completedCount} / {month.tasks.length} vazifa bajarildi
-                  </span>
-                </div>
-
-                {/* Tasks List */}
-                <div className="mt-4 space-y-2.5">
-                  {month.tasks.map((task) => {
-                    const done = !!profile.completedTasks[task.id];
-                    return (
-                      <div
-                        key={task.id}
-                        onClick={() => handleToggleTask(task.id)}
-                        className={`p-3.5 rounded-xl border flex items-center justify-between cursor-pointer transition select-none ${
-                          done
-                            ? 'bg-slate-950/40 border-slate-800/80 text-slate-500'
-                            : 'bg-slate-950 border-slate-800 text-slate-200 hover:border-slate-700'
-                        }`}
-                      >
-                        <div className="flex items-center space-x-3">
-                          {done ? (
-                            <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                          ) : (
-                            <Circle className="w-4 h-4 text-slate-600 flex-shrink-0" />
-                          )}
-                          <div>
-                            <span className={`text-xs font-semibold ${done ? 'line-through' : ''}`}>
-                              {task.name}
-                            </span>
-                            <span className="block text-[10px] text-cyan-400 mt-0.5">
-                              Tavsiya etilgan manba: {task.resource}
-                            </span>
-                          </div>
-                        </div>
-
-                        <span className="text-[10px] font-bold text-amber-400/90 ml-2 whitespace-nowrap">
-                          {done ? 'Bajarildi' : '+50 XP'}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
         </div>
       </div>
     );
@@ -3113,8 +2904,11 @@ export default function App() {
         <div>
           <h2 className="text-2xl font-black text-white">{t.compareTitle}</h2>
           <p className="text-xs text-slate-400 mt-1">{t.compareSubtitle}</p>
+          <p className="text-xs text-amber-300 mt-2">{tx('compareWarning')}</p>
         </div>
 
+        <p className="text-xs text-cyan-300">{comparisonLoading ? tx('loading') : comparisonTest ? 'Assessment '+comparisonTest.version+tx('included') : tx('noTest')}</p>
+        {!comparisonReady && <p className="text-amber-300 text-sm">{tx('needsData')}</p>}
         {/* Selection Checkboxes */}
         <div className="bg-slate-900/60 border border-slate-800 p-4 rounded-2xl">
           <label className="block text-xs font-bold text-slate-300 mb-2">{t.selectCareersToCompare}</label>
@@ -3159,12 +2953,12 @@ export default function App() {
             </thead>
             <tbody className="divide-y divide-slate-800/60">
               <tr>
-                <td className="p-4 text-slate-400 font-medium">Moslik ko'rsatkichi</td>
+                <td className="p-4 text-slate-400 font-medium">{tx('fit')}</td>
                 {selectedCareers.map(c => {
-                  const s = careerScores.find(item => item.career.id === c.id)?.matchScore || 70;
+                  const score = comparisonRanks.find(item=>item.career.id===c.id)?.score;
                   return (
                     <td key={c.id} className="p-4 font-black text-cyan-400 text-sm">
-                      {s}%
+                      {comparisonReady && !comparisonLoading && score !== undefined ? score+'%' : tx('unrated')}
                     </td>
                   );
                 })}
@@ -3173,7 +2967,7 @@ export default function App() {
                 <td className="p-4 text-slate-400 font-medium">{t.salaryRange}</td>
                 {selectedCareers.map(c => (
                   <td key={c.id} className="p-4 font-semibold text-white">
-                    {c.baseSalary}
+                    {tx('awaiting')}
                   </td>
                 ))}
               </tr>
@@ -3181,7 +2975,7 @@ export default function App() {
                 <td className="p-4 text-slate-400 font-medium">{t.demandLevel}</td>
                 {selectedCareers.map(c => (
                   <td key={c.id} className="p-4 font-semibold text-emerald-400">
-                    {c.demand}
+                    {tx('awaiting')}
                   </td>
                 ))}
               </tr>
@@ -3189,7 +2983,7 @@ export default function App() {
                 <td className="p-4 text-slate-400 font-medium">{t.remotePotential}</td>
                 {selectedCareers.map(c => (
                   <td key={c.id} className="p-4 font-semibold text-cyan-400">
-                    {c.remoteScore}%
+                    {tx('awaiting')}
                   </td>
                 ))}
               </tr>
@@ -3205,7 +2999,7 @@ export default function App() {
                 <td className="p-4 text-slate-400 font-medium">{t.growthForecast}</td>
                 {selectedCareers.map(c => (
                   <td key={c.id} className="p-4 font-semibold text-slate-200">
-                    {c.growthRate}
+                    {tx('awaiting')}
                   </td>
                 ))}
               </tr>
@@ -3224,6 +3018,18 @@ export default function App() {
           <p className="text-xs text-slate-400 mt-1">Shaxsiy diagnostika ma'lumotlaringizni tahrirlash.</p>
         </div>
 
+        <Suspense fallback={<p role="status" className="px-4 py-6 text-slate-300">Sahifa yuklanmoqda…</p>}><AccountPanel session={session} onSession={setSession} onSaveProfile={saveProfileToCloud} onLoadProfile={loadProfileFromCloud} /></Suspense>
+        <div className="rounded-xl border border-cyan-500/30 bg-slate-900/70 p-4 space-y-3">
+          <div className="flex justify-between text-sm"><strong>Profil to‘liqligi</strong><span>{profileCompletion}%</span></div>
+          <div className="h-2 bg-slate-800 rounded-full overflow-hidden"><div className="h-2 bg-cyan-400 rounded-full" style={{width: profileCompletion + '%'}}/></div>
+          <p className="text-xs text-slate-400">Ism, yosh, ta’lim darajasi, muassasa, mutaxassislik va qiziqishlar hisoblanadi.</p>
+          {!profileIsValid && <p className="text-xs text-amber-300">Bulutga saqlash uchun ism (kamida 2 belgi), yosh, ta’lim darajasi, muassasa va mutaxassislikni kiriting.</p>}
+          {session && <label className="flex items-start gap-2 text-sm text-slate-200">
+            <input type="checkbox" checked={autoSaveConsent} onChange={e=>setAutoSaveConsent(e.target.checked)}/>
+            <span>Profilimni o‘zgartirganimda Supabase'ga avtomatik saqlashga roziman (istalgan vaqtda o‘chirish mumkin).</span>
+          </label>}
+          {profileSyncStatus && <p role="status" className="text-xs text-cyan-300">{profileSyncStatus}</p>}
+        </div>
         <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 sm:p-8 backdrop-blur-md space-y-6">
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
@@ -3276,10 +3082,11 @@ export default function App() {
       <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
         <div>
           <h2 className="text-2xl font-black text-white">{t.settingsTitle}</h2>
-          <p className="text-xs text-slate-400 mt-1">Tizim parametrlari va ma'lumotlar boshqaruvi.</p>
+          <p className="text-xs text-slate-400 mt-1">{tx('settingsSubtitle')}</p>
         </div>
 
         <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 sm:p-8 backdrop-blur-md space-y-6">
+          {isAdmin && <button type="button" onClick={() => setActiveTab('admin')} className="rounded-xl border border-indigo-500/30 bg-indigo-950/30 px-4 py-3 text-sm font-semibold text-indigo-200">Admin Panel</button>}
           {/* Language Switch */}
           <div>
             <label className="block text-xs font-bold text-slate-300 mb-2">{t.languageSelect}</label>
@@ -3308,7 +3115,7 @@ export default function App() {
           <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
             <div>
               <div className="text-sm font-bold text-white">{t.resetAssessment}</div>
-              <div className="text-xs text-slate-400">Yangi ma'lumotlar bilan qayta test topshirish.</div>
+              <div className="text-xs text-slate-400">{tx('retakeSubtitle')}</div>
             </div>
             <button
               onClick={() => {
@@ -3317,7 +3124,7 @@ export default function App() {
               }}
               className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-white transition"
             >
-              Testni boshlash
+              {tx('start')}
             </button>
           </div>
 
@@ -3325,17 +3132,18 @@ export default function App() {
           <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
             <div>
               <div className="text-sm font-bold text-rose-400">{t.clearData}</div>
-              <div className="text-xs text-slate-400">Barcha saqlangan progress va xabarlarni tozalash.</div>
+              <div className="text-xs text-slate-400">{tx('clearSubtitle')}</div>
             </div>
             <button
               onClick={() => {
-                localStorage.clear();
+                localStorage.removeItem('careermind_profile_' + localDataOwner);
+                localStorage.removeItem('careermind_chat_' + localDataOwner);
                 setProfile(INITIAL_PROFILE);
                 setActiveTab('home');
               }}
               className="px-4 py-2 rounded-xl bg-rose-600/20 border border-rose-500/40 text-rose-300 hover:bg-rose-600/30 text-xs font-semibold transition"
             >
-              O'chirish
+              {tx('delete')}
             </button>
           </div>
         </div>
@@ -3344,23 +3152,47 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-cyan-500 selection:text-slate-950 flex flex-col justify-between">
+    <div className="min-h-screen overflow-x-hidden bg-slate-950 text-slate-100 font-sans selection:bg-cyan-500 selection:text-slate-950 flex flex-col justify-between pb-28 xl:pb-0">
       <div>
         {renderNavbar()}
 
-        <main className="transition-all duration-300">
+        {!authReady || localDataOwner !== (session?.user.id ?? 'guest') ? (
+          <main className="max-w-4xl mx-auto p-10 text-slate-300" role="status">
+            Hisob ma’lumotlari ajratilmoqda…
+          </main>
+        ) : <main className="transition-all duration-300">
           {activeTab === 'home' && renderLandingPage()}
-          {activeTab === 'assessment' && renderAssessment()}
-          {activeTab === 'dashboard' && renderDashboard()}
-          {activeTab === 'careers' && renderCareerDirectory()}
+          {activeTab === 'assessment' && <><div className="max-w-4xl mx-auto px-4 pt-6"><button onClick={() => setActiveTab('assessmentV3')} className="bg-cyan-700 hover:bg-cyan-600 text-white rounded-xl px-5 py-3 font-bold">{lx('newTest')}</button></div>{renderAssessment()}</>}
+          {activeTab === 'assessmentV3' && <><div className="max-w-4xl mx-auto px-4 pt-6"><button onClick={() => setActiveTab('adaptiveAssessment')} className="bg-purple-700 hover:bg-purple-600 text-white rounded-xl px-5 py-3 font-bold">{lx('adaptiveTest')}</button></div><Suspense fallback={<p role="status" className="px-4 py-6 text-slate-300">Sahifa yuklanmoqda…</p>}><AssessmentV3 session={session} /></Suspense></>}
+          {activeTab === 'adaptiveAssessment' && <Suspense fallback={<p role="status" className="px-4 py-6 text-slate-300">Sahifa yuklanmoqda…</p>}><AdaptiveAssessment session={session} /></Suspense>}
+          {(activeTab === 'dashboard' || activeTab === 'dashboardV2') && <Suspense fallback={<p role="status" className="px-4 py-6 text-slate-300">Sahifa yuklanmoqda…</p>}><DashboardV2 key={session?.user.id ?? 'guest'} lang={lang} session={session} onGo={setActiveTab} profile={{interests:profile.interests,skills:{...profile.skills}}} careers={CAREER_DATABASE.map(c=>({id:c.id,title:c.titleKey,category:c.category,description:c.descriptionKey,requiredSkills:c.requiredSkills as Record<string,number>,associatedInterests:c.associatedInterests}))} selectedCareer={profile.selectedCareerId ? selectedCareer.titleKey : null} /></Suspense>}
+          {activeTab === 'careers' && <><div className="max-w-5xl mx-auto px-4 pt-6"><button onClick={() => setActiveTab('careerMatchingV3')} className="bg-cyan-700 hover:bg-cyan-600 text-white rounded-xl px-5 py-3 font-bold">{lx('catalogButton')}</button></div>{renderCareerDirectory()}</>}
+          {activeTab === 'careerMatchingV3' && <Suspense fallback={<p role="status" className="px-4 py-6 text-slate-300">Sahifa yuklanmoqda…</p>}><CareerMatchingV3 key={session?.user.id ?? 'guest'} lang={lang} session={session} profile={{interests:profile.interests,skills:{...profile.skills}}} careers={CAREER_DATABASE.map(c=>({id:c.id,title:c.titleKey,category:c.category,description:c.descriptionKey,requiredSkills:c.requiredSkills as Record<string,number>,associatedInterests:c.associatedInterests}))} onChoose={(id)=>{setProfile(p=>({...p,selectedCareerId:id}));setActiveTab('smartRoadmap');}} /></Suspense>}
           {activeTab === 'myCareer' && renderCareerDetails()}
           {activeTab === 'skillGap' && renderSkillGap()}
-          {activeTab === 'roadmap' && renderRoadmap()}
+          {activeTab === 'roadmap' && <Suspense fallback={<p role="status" className="px-4 py-6 text-slate-300">Sahifa yuklanmoqda…</p>}><SmartRoadmap key={session?.user.id ?? 'guest'} lang={lang} session={session} career={selectedCareer.titleKey} /></Suspense>}
+          {activeTab === 'smartRoadmap' && <Suspense fallback={<p role="status" className="px-4 py-6 text-slate-300">Sahifa yuklanmoqda…</p>}><SmartRoadmap key={session?.user.id ?? 'guest'} lang={lang} session={session} career={selectedCareer.titleKey} /></Suspense>}
           {activeTab === 'compare' && renderCareerComparison()}
           {activeTab === 'assistant' && renderAiAssistant()}
           {activeTab === 'profile' && renderProfile()}
           {activeTab === 'settings' && renderSettings()}
-        </main>
+          {activeTab === 'admin' && isAdmin && <Suspense fallback={<p role="status" className="px-4 py-6 text-slate-300">Admin Panel yuklanmoqda…</p>}><AdminPanel key={session?.user.id ?? 'guest'} session={session} /></Suspense>}
+          {activeTab === 'support' && <Suspense fallback={<p role="status" className="px-4 py-6 text-slate-300">Sahifa yuklanmoqda…</p>}><SupportPage key={session?.user.id ?? 'guest'} lang={lang} session={session} onGoProfile={() => setActiveTab('profile')} /></Suspense>}
+        </main>}
+        <nav aria-label="Tezkor mobil navigatsiya" className="xl:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-4 gap-1 border-t border-slate-700 bg-slate-950/95 px-2 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur-xl">
+          {[
+            { id: 'home', label: 'Bosh sahifa', icon: Compass },
+            { id: 'assessment', label: 'Test', icon: BrainCircuit },
+            { id: 'dashboard', label: 'Natijalar', icon: BarChart3 },
+            { id: 'profile', label: 'Profil', icon: User }
+          ].map(({id,label,icon: Icon}) => (
+            <button key={id} type="button" aria-current={activeSection === id ? 'page' : undefined}
+              onClick={() => navigateTo(id)}
+              className={`flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[11px] font-semibold transition-colors ${activeSection === id ? 'bg-indigo-600/30 text-cyan-300' : 'text-slate-400 hover:bg-slate-800'}`}>
+              <Icon className="h-5 w-5" aria-hidden="true"/><span>{label}</span>
+            </button>
+          ))}
+        </nav>
       </div>
     </div>
   );
