@@ -9,7 +9,7 @@ const allowedOrigins = new Set(
     .split(',').map((origin) => origin.trim()).filter(Boolean)
 );
 const corsFor = (origin: string | null): Record<string, string> => ({
-  'Access-Control-Allow-Headers': 'authorization, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Vary': 'Origin',
   ...(origin && allowedOrigins.has(origin) ? { 'Access-Control-Allow-Origin': origin } : {}),
