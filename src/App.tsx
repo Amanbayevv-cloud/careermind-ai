@@ -1594,11 +1594,7 @@ export default function App() {
           onClick={() => navigateTo('home')}
           className="flex min-w-0 shrink items-center gap-2 sm:gap-3 cursor-pointer group select-none"
         >
-          <div className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-cyan-400 p-0.5 shadow-lg shadow-indigo-500/20 group-hover:shadow-indigo-500/40 transition">
-            <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
-              <BrainCircuit className="w-5 h-5 text-cyan-400 group-hover:scale-110 transition duration-300" />
-            </div>
-          </div>
+          <img src="/favicon.svg" alt="CareerMind AI logotipi" className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-xl group-hover:scale-105 transition duration-300" />
           <div>
             <span className="font-extrabold text-sm sm:text-xl tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
               CareerMind <span className="text-cyan-400 font-mono">AI</span>
